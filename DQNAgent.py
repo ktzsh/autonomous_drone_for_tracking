@@ -1,6 +1,4 @@
-from Detector import Detector
-from MultiRotorConnector import MultiRotorConnector
-import tensorflow as tf
+from Environment import Environment
 
-_detector = Detector()
-_detector.test()
+env = Environment()
+state = env.reset()

@@ -32,6 +32,8 @@ class Detector:
     DOWNLOAD_BASE  = 'http://download.tensorflow.org/models/object_detection/'
     PATH_TO_LABELS = os.path.join('TF_ObjectDetection/object_detection/data', 'mscoco_label_map.pbtxt')
 
+    min_score_thresh = 0.6
+
     def __init__(self):
         if not os.path.isfile(self.MODEL_FILE):
             opener = urllib.request.URLopener()
@@ -55,7 +57,7 @@ class Detector:
         label_map      = label_map_util.load_labelmap(self.PATH_TO_LABELS)
         categories     = label_map_util.convert_label_map_to_categories( label_map,
                                                                          max_num_classes=self.NUM_CLASSES, use_display_name=True)
-        category_index = label_map_util.create_category_index(categories)
+        self.category_index = label_map_util.create_category_index(categories)
 
     def load_image_into_numpy_array(self,image):
         (im_width, im_height) = image.size
@@ -131,14 +133,53 @@ class Detector:
                                                                 output_dict['detection_boxes'],
                                                                 output_dict['detection_classes'],
                                                                 output_dict['detection_scores'],
-                                                                category_index,
+                                                                self.category_index,
                                                                 instance_masks=output_dict.get('detection_masks'),
                                                                 use_normalized_coordinates=True,
-                                                                line_thickness=8)
-            plt.figure(figsize=IMAGE_SIZE)
-            plt.imshow(image_np)
+                                                                line_thickness=2)
+            import matplotlib.image as mpimg
+            mpimg.imsave(image_path.split('/')[-1], image_np)
 
     def detect(self, image_np):
-        image_np_expanded = np.expand_dims(image_np, axis=0)
-        output_dict       = self.run_inference_for_single_image(image_np)
-        return output_dict
+        image = image_np.copy()
+        # image_np_expanded = np.expand_dims(image_np, axis=0)
+        output_dict = self.run_inference_for_single_image(image_np)
+
+        # Visualization of the results of a detection.
+        vis_util.visualize_boxes_and_labels_on_image_array( image,
+                                                            output_dict['detection_boxes'],
+                                                            output_dict['detection_classes'],
+                                                            output_dict['detection_scores'],
+                                                            self.category_index,
+                                                            min_score_thresh=self.min_score_thresh,
+                                                            instance_masks=output_dict.get('detection_masks'),
+                                                            use_normalized_coordinates=True,
+                                                            skip_scores=False,
+                                                            skip_labels=False,
+                                                            line_thickness=2)
+        import matplotlib.image as mpimg
+        mpimg.imsave('detect.jpg', image)
+
+        bboxes  = output_dict['detection_boxes']
+        classes = output_dict['detection_classes']
+        scores  = output_dict['detection_scores']
+
+        im_width, im_height = image_np.shape[0:2]
+        for i in range(bboxes.shape[0]):
+          if scores is None or scores[i] > self.min_score_thresh:
+            if classes[i] in self.category_index.keys():
+                class_name = self.category_index[classes[i]]['name']
+                if class_name=='traffic light':
+                    box = tuple(bboxes[i].tolist())
+                    ymin, xmin, ymax, xmax = box
+                    left   = xmin * im_width
+                    right  = xmax * im_width
+                    top    = ymin * im_height
+                    bottom = ymax * im_height
+
+                    POS_X  = (left + right - im_width)/2.0
+                    POS_Y  = (top + bottom - im_height)/2.0
+                    WIDTH  = right - left
+                    HEIGHT = bottom - top
+
+                    return (POS_X, POS_Y, WIDTH, HEIGHT)
