@@ -8,7 +8,7 @@ import six.moves.urllib as urllib
 
 from collections import defaultdict
 from io import StringIO
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 from PIL import Image
 
 python_path = os.path.abspath('TF_ObjectDetection')

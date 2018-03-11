@@ -1,19 +1,12 @@
 from Environment import Environment
 
-from argparse import ArgumentParser
-
+import os
+import random
 import numpy as np
-from cntk.core import Value
-from cntk.initializer import he_uniform
-from cntk.layers import Sequential, Convolution2D, Dense, default_options
-from cntk.layers.typing import Signature, Tensor
-from cntk.learners import adam, learning_rate_schedule, momentum_schedule, UnitType
-from cntk.logging import TensorBoardProgressWriter
-from cntk.ops import abs, argmax, element_select, less, relu, reduce_max, reduce_sum, square
-from cntk.ops.functions import CloneMethod, Function
-from cntk.train import Trainer
-
-import csv
+import tensorflow as tf
+from collections import deque
+from keras.models import Sequential
+from keras.layers import Convolution2D, Flatten, Dense, LSTM
 
 class ReplayMemory(object):
     """
@@ -23,54 +16,40 @@ class ReplayMemory(object):
     (w.r.t the number of previous frames needed).
     """
     def __init__(self, size, sample_shape, history_length=4):
-        self._pos = 0
-        self._count = 0
-        self._max_size = size
+        self._pos            = 0
+        self._count          = 0
+        self._max_size       = size
         self._history_length = max(1, history_length)
-        self._state_shape = sample_shape
-        self._states = np.zeros((size,) + sample_shape, dtype=np.float32)
-        self._actions = np.zeros(size, dtype=np.uint8)
-        self._rewards = np.zeros(size, dtype=np.float32)
-        self._terminals = np.zeros(size, dtype=np.float32)
+        self._state_shape    = sample_shape
+        self._states         = np.zeros((size,) + sample_shape, dtype=np.float32)
+        self._actions        = np.zeros(size, dtype=np.uint8)
+        self._rewards        = np.zeros(size, dtype=np.float32)
+        self._terminals      = np.zeros(size, dtype=np.float32)
 
     def __len__(self):
         """ Returns the number of items currently present in the memory
-        Returns: Int >= 0
         """
         return self._count
 
     def append(self, state, action, reward, done):
         """ Appends the specified transition to the memory.
-
-        Attributes:
-            state (Tensor[sample_shape]): The state to append
-            action (int): An integer representing the action done
-            reward (float): An integer representing the reward received for doing this action
-            done (bool): A boolean specifying if this state is a terminal (episode has finished)
         """
         assert state.shape == self._state_shape, \
             'Invalid state shape (required: %s, got: %s)' % (self._state_shape, state.shape)
 
-        self._states[self._pos] = state
-        self._actions[self._pos] = action
-        self._rewards[self._pos] = reward
+        self._states[self._pos]    = state
+        self._actions[self._pos]   = action
+        self._rewards[self._pos]   = reward
         self._terminals[self._pos] = done
 
         self._count = max(self._count, self._pos + 1)
-        self._pos = (self._pos + 1) % self._max_size
+        self._pos   = (self._pos + 1) % self._max_size
 
     def sample(self, size):
         """ Generate size random integers mapping indices in the memory.
             The returned indices can be retrieved using #get_state().
             See the method #minibatch() if you want to retrieve samples directly.
-
-        Attributes:
-            size (int): The minibatch size
-
-        Returns:
-             Indexes of the sampled states ([int])
         """
-
         # Local variable access is faster in loops
         count, pos, history_len, terminals = self._count - 1, self._pos, \
                                              self._history_length, self._terminals
@@ -91,20 +70,14 @@ class ReplayMemory(object):
 
     def minibatch(self, size):
         """ Generate a minibatch with the number of samples specified by the size parameter.
-
-        Attributes:
-            size (int): Minibatch size
-
-        Returns:
-            tuple: Tensor[minibatch_size, input_shape...], [int], [float], [bool]
         """
         indexes = self.sample(size)
 
-        pre_states = np.array([self.get_state(index) for index in indexes], dtype=np.float32)
+        pre_states  = np.array([self.get_state(index) for index in indexes], dtype=np.float32)
         post_states = np.array([self.get_state(index + 1) for index in indexes], dtype=np.float32)
-        actions = self._actions[indexes]
-        rewards = self._rewards[indexes]
-        dones = self._terminals[indexes]
+        actions     = self._actions[indexes]
+        rewards     = self._rewards[indexes]
+        dones       = self._terminals[indexes]
 
         return pre_states, actions, post_states, rewards, dones
 
@@ -112,17 +85,11 @@ class ReplayMemory(object):
         """
         Return the specified state with the replay memory. A state consists of
         the last `history_length` perceptions.
-
-        Attributes:
-            index (int): State's index
-
-        Returns:
-            State at specified index (Tensor[history_length, input_shape...])
         """
         if self._count == 0:
             raise IndexError('Empty Memory')
 
-        index %= self._count
+        index         %= self._count
         history_length = self._history_length
 
         # If index > history_length, take from a slice
@@ -132,220 +99,156 @@ class ReplayMemory(object):
             indexes = np.arange(index - history_length + 1, index + 1)
             return self._states.take(indexes, mode='wrap', axis=0)
 
+
 class History(object):
     """
     Accumulator keeping track of the N previous frames to be used by the agent
     for evaluation
     """
-
     def __init__(self, shape):
         self._buffer = np.zeros(shape, dtype=np.float32)
 
     @property
     def value(self):
         """ Underlying buffer with N previous states stacked along first axis
-
-        Returns:
-            Tensor[shape]
         """
         return self._buffer
 
     def append(self, state):
         """ Append state to the history
-
-        Attributes:
-            state (Tensor) : The state to append to the memory
         """
         self._buffer[:-1] = self._buffer[1:]
-        self._buffer[-1] = state
+        self._buffer[-1]  = state
 
     def reset(self):
         """ Reset the memory. Underlying buffer set all indexes to 0
-
         """
         self._buffer.fill(0)
 
-class LinearEpsilonAnnealingExplorer(object):
-    """
-    Exploration policy using Linear Epsilon Greedy
-
-    Attributes:
-        start (float): start value
-        end (float): end value
-        steps (int): number of steps between start and end
-    """
-
-    def __init__(self, start, end, steps):
-        self._start = start
-        self._stop = end
-        self._steps = steps
-
-        self._step_size = (end - start) / steps
-
-    def __call__(self, num_actions):
-        """
-        Select a random action out of `num_actions` possibilities.
-
-        Attributes:
-            num_actions (int): Number of actions available
-        """
-        return np.random.choice(num_actions)
-
-    def _epsilon(self, step):
-        """ Compute the epsilon parameter according to the specified step
-
-        Attributes:
-            step (int)
-        """
-        if step < 0:
-            return self._start
-        elif step > self._steps:
-            return self._stop
-        else:
-            return self._step_size * step + self._start
-
-    def is_exploring(self, step):
-        """ Commodity method indicating if the agent should explore
-
-        Attributes:
-            step (int) : Current step
-
-        Returns:
-             bool : True if exploring, False otherwise
-        """
-        return np.random.rand() < self._epsilon(step)
-
-def huber_loss(y, y_hat, delta):
-    """ Compute the Huber Loss as part of the model graph
-
-    Huber Loss is more robust to outliers. It is defined as:
-     if |y - y_hat| < delta :
-        0.5 * (y - y_hat)**2
-    else :
-        delta * |y - y_hat| - 0.5 * delta**2
-
-    Attributes:
-        y (Tensor[-1, 1]): Target value
-        y_hat(Tensor[-1, 1]): Estimated value
-        delta (float): Outliers threshold
-
-    Returns:
-        CNTK Graph Node
-    """
-    half_delta_squared = 0.5 * delta * delta
-    error = y - y_hat
-    abs_error = abs(error)
-
-    less_than = 0.5 * square(error)
-    more_than = (delta * abs_error) - half_delta_squared
-    loss_per_sample = element_select(less(abs_error, delta), less_than, more_than)
-
-    return reduce_sum(loss_per_sample, name='loss')
 
 class DeepQAgent(object):
     """
     Implementation of Deep Q Neural Network agent like in:
-        Nature 518. "Human-level control through deep reinforcement learning" (Mnih & al. 2015)
+    Nature 518. "Human-level control through deep reinforcement learning" (Mnih & al. 2015)
     """
-    def __init__(self, input_shape, nb_actions,
-                 gamma=0.99, explorer=LinearEpsilonAnnealingExplorer(1, 0.1, 1000000),
-                 learning_rate=0.00025, momentum=0.95, minibatch_size=32,
-                 memory_size=500000, train_after=10000, train_interval=4, target_update_interval=10000,
-                 monitor=True):
-        self.input_shape = input_shape
-        self.nb_actions = nb_actions
-        self.gamma = gamma
 
-        self._train_after = train_after
-        self._train_interval = train_interval
-        self._target_update_interval = target_update_interval
+    NUM_EPISODES           = 12000  # Number of episodes the agent plays
+    STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
+    GAMMA                  = 0.99  # Discount factor
+    EXPLORATION_STEPS      = 1000000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+    INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
+    FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
+    INITIAL_REPLAY_SIZE    = 20000  # Number of steps to populate the replay memory before training starts
+    NUM_REPLAY_MEMORY      = 400000  # Number of replay memory the agent uses for training
+    BATCH_SIZE             = 32  # Mini batch size
+    TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
+    TRAIN_INTERVAL         = 4  # The agent selects 4 actions between successive updates
+    LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
+    MOMENTUM               = 0.95  # Momentum used by RMSProp
+    MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
+    SAVE_INTERVAL          = 300000  # The frequency with which the network is saved
+    NO_OP_STEPS            = 30  # Maximum number of "do nothing" actions to be performed by the agent at the start of an episode
+    LOAD_NETWORK           = False
+    TRAIN                  = True
+    SAVE_NETWORK_PATH      = 'models/chkpnt'
+    SAVE_SUMMARY_PATH      = 'logs/summary.log'
+    NUM_EPISODES_AT_TEST   = 30  # Number of episodes the agent plays at test time
+    MEMORY_SIZE            = 500000 # Size of replay memory
 
-        self._explorer = explorer
-        self._minibatch_size = minibatch_size
-        self._history = History(input_shape)
-        self._memory = ReplayMemory(memory_size, input_shape[1:], 4)
+    def __init__(self, input_shape, nb_actions):
+        self.t            = 0
+        self.epsilon      = self.INITIAL_EPSILON
+        self.epsilon_step = (self.INITIAL_EPSILON - self.FINAL_EPSILON) / self.EXPLORATION_STEPS
+
+        self.input_shape  = input_shape
+        self.nb_actions   = nb_actions
+
+        self._history           = History(input_shape)
+        self._memory            = ReplayMemory(self.MEMORY_SIZE, input_shape[1:], self.STATE_LENGTH)
         self._num_actions_taken = 0
 
-        # Metrics accumulator
-        self._episode_rewards, self._episode_q_means, self._episode_q_stddev = [], [], []
-
         # Action Value model (used by agent to interact with the environment)
-        with default_options(activation=relu, init=he_uniform()):
-            self._action_value_net = Sequential([
-                Dense(64, activation='relu')
-                Dense(64, activation='relu'),
-                Dense(nb_actions, activation=None, init=he_uniform(scale=0.01))
-            ])
-        self._action_value_net.update_signature(Tensor[input_shape])
+        self.s, self.q_values, q_network = self.build_network(self.input_shape)
+        q_network_weights = q_network.trainable_weights
 
         # Target model used to compute the target Q-values in training, updated
         # less frequently for increased stability.
-        self._target_net = self._action_value_net.clone(CloneMethod.freeze)
+        self.st, self.target_q_values, target_network = self.build_network(self.input_shape)
+        target_network_weights = target_network.trainable_weights
 
-        # Function computing Q-values targets as part of the computation graph
-        @Function
-        @Signature(post_states=Tensor[input_shape], rewards=Tensor[()], terminals=Tensor[()])
-        def compute_q_targets(post_states, rewards, terminals):
-            return element_select(
-                terminals,
-                rewards,
-                gamma * reduce_max(self._target_net(post_states), axis=0) + rewards,
-            )
+        # Define target network update operation
+        self.update_target_network = [target_network_weights[i].assign(q_network_weights[i]) for i in range(len(target_network_weights))]
 
-        # Define the loss, using Huber Loss (more robust to outliers)
-        @Function
-        @Signature(pre_states=Tensor[input_shape], actions=Tensor[nb_actions],
-                   post_states=Tensor[input_shape], rewards=Tensor[()], terminals=Tensor[()])
-        def criterion(pre_states, actions, post_states, rewards, terminals):
-            # Compute the q_targets
-            q_targets = compute_q_targets(post_states, rewards, terminals)
+        # Define loss and gradient update operation
+        self.a, self.y, self.loss, self.grads_update = self.build_training_op(q_network_weights)
 
-            # actions is a 1-hot encoding of the action done by the agent
-            q_acted = reduce_sum(self._action_value_net(pre_states) * actions, axis=0)
+        self.sess  = tf.InteractiveSession()
+        self.saver = tf.train.Saver(q_network_weights)
 
-            # Define training criterion as the Huber Loss function
-            return huber_loss(q_targets, q_acted, 1.0)
+        self.summary_placeholders, self.update_ops, self.summary_op = self.setup_summary()
+        self.summary_writer = tf.summary.FileWriter(self.SAVE_SUMMARY_PATH, self.sess.graph)
 
-        # Adam based SGD
-        lr_schedule = learning_rate_schedule(learning_rate, UnitType.minibatch)
-        m_schedule = momentum_schedule(momentum)
-        vm_schedule = momentum_schedule(0.999)
-        l_sgd = adam(self._action_value_net.parameters, lr_schedule,
-                     momentum=m_schedule, variance_momentum=vm_schedule)
+        if not os.path.exists(self.SAVE_NETWORK_PATH):
+            os.makedirs(self.SAVE_NETWORK_PATH)
 
-        self._metrics_writer = TensorBoardProgressWriter(freq=1, log_dir='metrics', model=criterion) if monitor else None
-        self._learner = l_sgd
-        self._trainer = Trainer(criterion, (criterion, None), l_sgd, self._metrics_writer)
+        self.sess.run(tf.initialize_all_variables())
 
+        # Load network
+        if self.LOAD_NETWORK:
+            self.load_network()
+
+        # Initialize target network
+        self.sess.run(self.update_target_network)
+
+    def build_network(self, input_shape):
+        model = Sequential()
+        model.add(LSTM(32, input_shape=input_shape))
+        model.add(Dense(64, activation='relu'))
+        model.add(Dense(32, activation='relu'))
+        model.add(Dense(self.nb_actions))
+
+        s = tf.placeholder(tf.float32, (None,) + input_shape)
+        q_values = model(s)
+
+        return s, q_values, model
+
+    def build_training_op(self, q_network_weights):
+        a = tf.placeholder(tf.int64, [None])
+        y = tf.placeholder(tf.float32, [None])
+
+        # Convert action to one hot vector
+        a_one_hot = tf.one_hot(a, self.nb_actions, 1.0, 0.0)
+        q_value   = tf.reduce_sum(tf.multiply(self.q_values, a_one_hot), reduction_indices=1)
+
+        # Clip the error, the loss is quadratic when the error is in (-1, 1), and linear outside of that region
+        error          = tf.abs(y - q_value)
+        quadratic_part = tf.clip_by_value(error, 0.0, 1.0)
+        linear_part    = error - quadratic_part
+        loss           = tf.reduce_mean(0.5 * tf.square(quadratic_part) + linear_part)
+
+        optimizer    = tf.train.RMSPropOptimizer(self.LEARNING_RATE, momentum=self.MOMENTUM, epsilon=self.MIN_GRAD)
+        grads_update = optimizer.minimize(loss, var_list=q_network_weights)
+
+        return a, y, loss, grads_update
 
     def act(self, state):
         """ This allows the agent to select the next action to perform in regard of the current state of the environment.
         It follows the terminology used in the Nature paper.
-
-        Attributes:
-            state (Tensor[input_shape]): The current environment state
-
-        Returns: Int >= 0 : Next action to do
         """
         # Append the state to the short term memory (ie. History)
         self._history.append(state)
 
-        # If policy requires agent to explore, sample random action
-        if self._explorer.is_exploring(self._num_actions_taken):
-            action = self._explorer(self.nb_actions)
+        if self.epsilon >= random.random() or self.t < self.INITIAL_REPLAY_SIZE:
+            # Choose an action randomly
+            action = random.randrange(self.nb_actions)
         else:
             # Use the network to output the best action
             env_with_history = self._history.value
-            q_values = self._action_value_net.eval(
-                # Append batch axis with only one sample to evaluate
-                env_with_history.reshape((1,) + env_with_history.shape)
-            )
+            action = np.argmax(self.q_values.eval(feed_dict={self.s: env_with_history.reshape((1,) + env_with_history.shape)}))
 
-            self._episode_q_means.append(np.mean(q_values))
-            self._episode_q_stddev.append(np.std(q_values))
-
-            # Return the value maximizing the expected reward
-            action = q_values.argmax()
+        # Anneal epsilon linearly over time
+        if self.epsilon > self.FINAL_EPSILON and self.t >= self.INITIAL_REPLAY_SIZE:
+            self.epsilon -= self.epsilon_step
 
         # Keep track of interval action counter
         self._num_actions_taken += 1
@@ -353,21 +256,41 @@ class DeepQAgent(object):
 
     def observe(self, old_state, action, reward, done):
         """ This allows the agent to observe the output of doing the action it selected through act() on the old_state
-
-        Attributes:
-            old_state (Tensor[input_shape]): Previous environment state
-            action (int): Action done by the agent
-            reward (float): Reward for doing this action in the old_state environment
-            done (bool): Indicate if the action has terminated the environment
         """
-        self._episode_rewards.append(reward)
+        self.total_reward += reward
+        self.total_q_max  += np.max(self.q_values.eval(feed_dict={self.s: old_state}))
+        self.duration     += 1
 
         # If done, reset short term memory (ie. History)
         if done:
-            # Plot the metrics through Tensorboard and reset buffers
-            if self._metrics_writer is not None:
-                self._plot_metrics()
-            self._episode_rewards, self._episode_q_means, self._episode_q_stddev = [], [], []
+            # Write summary
+            if self.t >= self.INITIAL_REPLAY_SIZE:
+                stats = [self.total_reward, self.total_q_max / float(self.duration),
+                        self.duration, self.total_loss / (float(self.duration) / float(self.TRAIN_INTERVAL))]
+                for i in range(len(stats)):
+                    self.sess.run(self.update_ops[i], feed_dict={
+                        self.summary_placeholders[i]: float(stats[i])
+                    })
+                summary_str = self.sess.run(self.summary_op)
+                self.summary_writer.add_summary(summary_str, self.episode + 1)
+
+            # Debug
+            if self.t < self.INITIAL_REPLAY_SIZE:
+                mode = 'random'
+            elif self.INITIAL_REPLAY_SIZE <= self.t < self.INITIAL_REPLAY_SIZE + self.EXPLORATION_STEPS:
+                mode = 'explore'
+            else:
+                mode = 'exploit'
+            print('EPISODE: {0:6d} / TIMESTEP: {1:8d} / DURATION: {2:5d} / EPSILON: {3:.5f} / TOTAL_REWARD: {4:3.0f} / AVG_MAX_Q: {5:2.4f} / AVG_LOSS: {6:.5f} / MODE: {7}'.format(
+                self.episode + 1, self.t, self.duration, self.epsilon,
+                self.total_reward, self.total_q_max / float(self.duration),
+                self.total_loss / (float(self.duration) / float(self.TRAIN_INTERVAL)), mode))
+
+            self.total_reward = 0
+            self.total_q_max  = 0
+            self.total_loss   = 0
+            self.duration     = 0
+            self.episode      += 1
 
             # Reset the short term memory
             self._history.reset()
@@ -385,72 +308,85 @@ class DeepQAgent(object):
 
         The Target Network is a frozen copy of the Action Value Network updated as regular intervals.
         """
-
         agent_step = self._num_actions_taken
-
         if agent_step >= self._train_after:
             if (agent_step % self._train_interval) == 0:
-                pre_states, actions, post_states, rewards, terminals = self._memory.minibatch(self._minibatch_size)
+                # Clip all positive rewards at 1 and all negative rewards at -1, leaving 0 rewards unchanged
+                # reward = np.clip(reward, -1, 1)
 
-                self._trainer.train_minibatch(
-                    self._trainer.loss_function.argument_map(
-                        pre_states=pre_states,
-                        actions=Value.one_hot(actions.reshape(-1, 1).tolist(), self.nb_actions),
-                        post_states=post_states,
-                        rewards=rewards,
-                        terminals=terminals
-                    )
-                )
+                if self.t >= self.INITIAL_REPLAY_SIZE:
+                    # Train network
+                    if self.t % self.TRAIN_INTERVAL == 0:
+                        self.train_network()
 
-                # Update the Target Network if needed
-                if (agent_step % self._target_update_interval) == 0:
-                    self._target_net = self._action_value_net.clone(CloneMethod.freeze)
-                    filename = "models\model%d" % agent_step
-                    self._trainer.save_checkpoint(filename)
+                    # Update target network
+                    if self.t % self.TARGET_UPDATE_INTERVAL == 0:
+                        self.sess.run(self.update_target_network)
 
-    def _plot_metrics(self):
-        """Plot current buffers accumulated values to visualize agent learning
-        """
-        if len(self._episode_q_means) > 0:
-            mean_q = np.asscalar(np.mean(self._episode_q_means))
-            self._metrics_writer.write_value('Mean Q per ep.', mean_q, self._num_actions_taken)
+                    # Save network
+                    if self.t % self.SAVE_INTERVAL == 0:
+                        save_path = self.saver.save(self.sess, self.SAVE_NETWORK_PATH, global_step=self.t)
+                        print('Successfully saved: ' + save_path)
 
-        if len(self._episode_q_stddev) > 0:
-            std_q = np.asscalar(np.mean(self._episode_q_stddev))
-            self._metrics_writer.write_value('Mean Std Q per ep.', std_q, self._num_actions_taken)
+                self.t += 1
 
-        self._metrics_writer.write_value('Sum rewards per ep.', sum(self._episode_rewards), self._num_actions_taken)
+    def train_network(self):
+        # Sample random minibatch of transition from replay memory
+        state_batch, action_batch, next_state_batch, reward_batch, terminal_batch = self._memory.minibatch(self._minibatch_size)
+
+        target_q_values_batch = self.target_q_values.eval(feed_dict={self.st: next_state_batch})
+        y_batch               = reward_batch + (1 - terminal_batch) * self.GAMMA * np.max(target_q_values_batch, axis=1)
+
+        loss, _ = self.sess.run([self.loss, self.grads_update], feed_dict={
+            self.s: state_batch,
+            self.a: action_batch,
+            self.y: y_batch
+        })
+        self.total_loss += loss
+
+    def setup_summary(self):
+        episode_total_reward = tf.Variable(0.)
+        episode_avg_max_q    = tf.Variable(0.)
+        episode_duration     = tf.Variable(0.)
+        episode_avg_loss     = tf.Variable(0.)
+
+        tf.summary.scalar('Logs/Total Reward/Episode', episode_total_reward)
+        tf.summary.scalar('Logs/Average Max Q/Episode', episode_avg_max_q)
+        tf.summary.scalar('Logs/Duration/Episode', episode_duration)
+        tf.summary.scalar('Logs/Average Loss/Episode', episode_avg_loss)
+
+        summary_vars         = [episode_total_reward, episode_avg_max_q, episode_duration, episode_avg_loss]
+        summary_placeholders = [tf.placeholder(tf.float32) for _ in range(len(summary_vars))]
+        update_ops           = [summary_vars[i].assign(summary_placeholders[i]) for i in range(len(summary_vars))]
+        summary_op           = tf.summary.merge_all()
+
+        return summary_placeholders, update_ops, summary_op
+
+    def load_network(self):
+        checkpoint = tf.train.get_checkpoint_state(self.SAVE_NETWORK_PATH)
+        if checkpoint and checkpoint.model_checkpoint_path:
+            self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
+            print('Successfully loaded: ' + checkpoint.model_checkpoint_path)
+        else:
+            print('Training new network...')
 
 
 def get_iou(bb1, bb2):
     """
     Calculate the Intersection over Union (IoU) of two bounding boxes.
-
-    Parameters
-    ----------
-    bb1 : dict
-        Keys: {'x1', 'x2', 'y1', 'y2'}
         The (x1, y1) position is at the top left corner,
-        the (x2, y2) position is at the bottom right corner
-    bb2 : dict
-        Keys: {'x1', 'x2', 'y1', 'y2'}
-        The (x, y) position is at the top left corner,
-        the (x2, y2) position is at the bottom right corner
-
-    Returns
-    -------
-    float
-        in [0, 1]
+        The (x2, y2) position is at the bottom right corner
     """
+
     assert bb1['x1'] < bb1['x2']
     assert bb1['y1'] < bb1['y2']
     assert bb2['x1'] < bb2['x2']
     assert bb2['y1'] < bb2['y2']
 
     # determine the coordinates of the intersection rectangle
-    x_left = max(bb1['x1'], bb2['x1'])
-    y_top = max(bb1['y1'], bb2['y1'])
-    x_right = min(bb1['x2'], bb2['x2'])
+    x_left   = max(bb1['x1'], bb2['x1'])
+    y_top    = max(bb1['y1'], bb2['y1'])
+    x_right  = min(bb1['x2'], bb2['x2'])
     y_bottom = min(bb1['y2'], bb2['y2'])
 
     if x_right < x_left or y_bottom < y_top:
@@ -498,7 +434,7 @@ def compute_reward(state, collision_info, max_dist):
     SCALE = 2.
 
     if collision_info.has_collided:
-        reward = -100
+        reward = -10
     else:
         x = state.POS_X
         y = state.POS_Y
@@ -524,36 +460,37 @@ def compute_reward(state, collision_info, max_dist):
 
     return reward
 
-def isDone(reward):
+def is_done(reward):
     done = 0
-    if  reward <= -10:
+    if  reward <= -100:
         done = 1
     return done
 
 
 if __name__=='__main__':
     # Make RL agent
-    NumBufferFrames = 4
-    InputDims = 8
-    NumActions = 7
-    agent = DeepQAgent((NumBufferFrames, InputDims), NumActions, monitor=True)
+    input_dims       = 8
+    num_actions      = 7
+    num_buff_frames  = 4
+
+    agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 
     # Train
-    epoch = 100
+    epoch        = 100
     current_step = 0
-    max_steps = epoch * 250000
+    max_steps    = epoch * 250000
 
-    env = Environment()
+    env           = Environment()
     current_state = env.reset()
 
     while True:
-        action = agent.act(current_state)
+        action      = agent.act(current_state)
         quad_offset = interpret_action(action)
 
         new_state, collision_info = env.step(quad_offset, duration=5)
 
         reward = compute_reward(new_state, collision_info)
-        done = isDone(reward)
+        done   = is_done(reward)
         print('Action, Reward, Done:', action, reward, done)
 
         agent.observe(current_state, action, reward, done)
