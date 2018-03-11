@@ -32,7 +32,7 @@ class Detector:
     DOWNLOAD_BASE  = 'http://download.tensorflow.org/models/object_detection/'
     PATH_TO_LABELS = os.path.join('TF_ObjectDetection/object_detection/data', 'mscoco_label_map.pbtxt')
 
-    min_score_thresh = 0.6
+    min_score_thresh = 0.7
 
     def __init__(self):
         if not os.path.isfile(self.MODEL_FILE):

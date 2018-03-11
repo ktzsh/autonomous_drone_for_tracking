@@ -17,6 +17,18 @@ class Environment:
         self._connector = MultiRotorConnector()
         self._detector  = Detector()
 
+    def state_to_array(self, state):
+        out = np.zeros((8,), dtype='float32')
+        out[0] = state.VEL_X
+        out[1] = state.VEL_Y
+        out[2] = state.VEL_Z
+        out[3] = state.POS_X
+        out[4] = state.POS_Y
+        out[5] = state.WIDTH
+        out[6] = state.HEIGHT
+        out[7] = state.ALTITUDE
+        return out
+
     def update(self, state):
         velocity = self._connector.get_velocity()
         state.VEL_X = velocity.x_val
@@ -46,11 +58,12 @@ class Environment:
     def reset(self):
         _state = State()
         self.update(_state)
-        return _state
+        return self.state_to_array(_state)
 
     def step(self, action, duration=5):
         _state = State()
         self._connector.move_by_velocity(action, duration=duration)
         time.sleep(1)
+        collision_info = self._connector.get_collision_info()
         self.update(_state)
-        return _state
+        return self.state_to_array(_state), collision_info
