@@ -1,3 +1,5 @@
+import numpy as np
+
 from Detector import Detector
 from MultiRotorConnector import MultiRotorConnector
 
@@ -40,6 +42,9 @@ class Environment:
 
         frame        = self._connector.get_frame()
         output       = self._detector.detect(frame)
+        if not output:
+            return 0
+
         state.POS_X  = output[0]
         state.POS_Y  = output[1]
         state.WIDTH  = output[2]
@@ -55,15 +60,22 @@ class Environment:
         print "Width     :", state.WIDTH
         print "Height    :", state.HEIGHT
 
+        return 1
+
     def reset(self):
+        # TODO - Implement Reset Environment
+        # Get the position of car and take the multirotor above it
         _state = State()
-        self.update(_state)
+        flag = self.update(_state)
+        if not flag:
+            return 0
         return self.state_to_array(_state)
 
     def step(self, action, duration=5):
         _state = State()
         self._connector.move_by_velocity(action, duration=duration)
-        time.sleep(1)
         collision_info = self._connector.get_collision_info()
-        self.update(_state)
+        flag = self.update(_state)
+        if not flag:
+            return 0, 0
         return self.state_to_array(_state), collision_info

@@ -331,6 +331,8 @@ class DeepQAgent(object):
                 self.t += 1
 
     def train_network(self):
+        ''' Extension to train() call - Batch generation and graph computations
+        '''
         # Sample random minibatch of transition from replay memory
         state_batch, action_batch, next_state_batch, reward_batch, terminal_batch = self._memory.minibatch(self._minibatch_size)
 
@@ -428,6 +430,9 @@ def interpret_action(action):
     return quad_offset
 
 def compute_reward(state, collision_info, max_dist):
+    ''' Compute reward function which is scaled sumation of euclidean distance of center of bbox from center
+    of frame and IoU of bbox and a imaginary box centered at frame center with dimensions THRESH_H x THRESH_W
+    '''
     THRESH_W = 25.
     THRESH_H = 25.
 
@@ -466,6 +471,12 @@ def is_done(reward):
         done = 1
     return done
 
+def restart_game():
+    # TODO - Implement Restart
+    # Call Environment reset - Check TODO in env.reset()
+    # Restart the game by making LOAD_NETWORK true if chkpnt exists
+    print "Restart the Game(NOT IMPLEMENTED)"
+    pass
 
 if __name__=='__main__':
     # Make RL agent
@@ -488,9 +499,13 @@ if __name__=='__main__':
         quad_offset = interpret_action(action)
 
         new_state, collision_info = env.step(quad_offset, duration=5)
+        if not new_state:
+            restart_game()
 
         reward = compute_reward(new_state, collision_info)
         done   = is_done(reward)
+        if done:
+            restart_game()
         print('Action, Reward, Done:', action, reward, done)
 
         agent.observe(current_state, action, reward, done)

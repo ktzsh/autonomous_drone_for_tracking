@@ -6,9 +6,10 @@ import numpy as np
 import tensorflow as tf
 import six.moves.urllib as urllib
 
-from collections import defaultdict
-from io import StringIO
-# from matplotlib import pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
+
 from PIL import Image
 
 python_path = os.path.abspath('TF_ObjectDetection')
@@ -32,6 +33,8 @@ class Detector:
     DOWNLOAD_BASE  = 'http://download.tensorflow.org/models/object_detection/'
     PATH_TO_LABELS = os.path.join('TF_ObjectDetection/object_detection/data', 'mscoco_label_map.pbtxt')
 
+
+    fig              = None
     min_score_thresh = 0.7
 
     def __init__(self):
@@ -108,7 +111,7 @@ class Detector:
                     output_dict['detection_masks'] = output_dict['detection_masks'][0]
         return output_dict
 
-    def test(self):
+    def test_detection(self):
         # If you want to test the code with your images, just add path to the images to the TEST_IMAGE_PATHS.
         PATH_TO_TEST_IMAGES_DIR = 'TF_ObjectDetection/object_detection/test_images'
         TEST_IMAGE_PATHS        = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, 'image{}.jpg'.format(i)) for i in range(1, 3) ]
@@ -157,8 +160,18 @@ class Detector:
                                                             skip_scores=False,
                                                             skip_labels=False,
                                                             line_thickness=2)
-        import matplotlib.image as mpimg
-        mpimg.imsave('detect.jpg', image)
+
+        # To Ensure that figure does not appear again on foreground and stays in background
+        if not self.fig:
+            plt.ion()
+            self.fig = plt.figure()
+            self.plot = plt.subplot(1,1,1)
+            plt.imshow(image)
+            self.fig.show()
+        else:
+            plt.imshow(image)
+            self.plot.relim()
+            self.fig.canvas.flush_events()
 
         bboxes  = output_dict['detection_boxes']
         classes = output_dict['detection_classes']
@@ -183,3 +196,5 @@ class Detector:
                     HEIGHT = bottom - top
 
                     return (POS_X, POS_Y, WIDTH, HEIGHT)
+
+        return None
