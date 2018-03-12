@@ -11,8 +11,8 @@ from AirSimClient import *
 class MultiRotorConnector:
     client = None
 
-    INIT_X = 2.5
-    INIT_Y = 3.0
+    INIT_X = -2.4
+    INIT_Y = -3.1
     INIT_Z = -15
 
     def __init__(self):
