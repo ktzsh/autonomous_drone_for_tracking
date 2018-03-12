@@ -16,6 +16,15 @@ y = position.y_val
 z = position.z_val
 print x, y, z
 
+connector.move_to_position([x, y, z])
+time.sleep(4)
+_ = connector.get_frame(path='1.png')
+position = connector.get_position()
+x = position.x_val
+y = position.y_val
+z = position.z_val
+print x, y, z
+
 connector.move_to_position([x, y, z+5])
 time.sleep(4)
 _ = connector.get_frame(path='2.png')
