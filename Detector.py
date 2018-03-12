@@ -57,9 +57,8 @@ class Detector:
                 tf.import_graph_def(od_graph_def, name='')
 
 
-        label_map      = label_map_util.load_labelmap(self.PATH_TO_LABELS)
-        categories     = label_map_util.convert_label_map_to_categories( label_map,
-                                                                         max_num_classes=self.NUM_CLASSES, use_display_name=True)
+        label_map  = label_map_util.load_labelmap(self.PATH_TO_LABELS)
+        categories = label_map_util.convert_label_map_to_categories( label_map, max_num_classes=self.NUM_CLASSES, use_display_name=True)
         self.category_index = label_map_util.create_category_index(categories)
 
     def load_image_into_numpy_array(self,image):

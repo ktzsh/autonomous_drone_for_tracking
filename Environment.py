@@ -43,7 +43,7 @@ class Environment:
         frame        = self._connector.get_frame()
         output       = self._detector.detect(frame)
         if not output:
-            return 0
+            return None
 
         state.POS_X  = output[0]
         state.POS_Y  = output[1]
@@ -68,7 +68,7 @@ class Environment:
         _state = State()
         flag = self.update(_state)
         if not flag:
-            return 0
+            raise Exception('Unable to detect any Object')
         return self.state_to_array(_state)
 
     def step(self, action, duration=5):
@@ -77,5 +77,5 @@ class Environment:
         collision_info = self._connector.get_collision_info()
         flag = self.update(_state)
         if not flag:
-            return 0, 0
+            raise Exception('Unable to detect any Object')
         return self.state_to_array(_state), collision_info

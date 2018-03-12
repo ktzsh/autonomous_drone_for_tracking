@@ -142,6 +142,7 @@ class DeepQAgent(object):
     NUM_REPLAY_MEMORY      = 400000  # Number of replay memory the agent uses for training
     BATCH_SIZE             = 32  # Mini batch size
     TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
+    TRAIN_AFTER            = 4 # Number of Steps after which training starts
     TRAIN_INTERVAL         = 4  # The agent selects 4 actions between successive updates
     LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
     MOMENTUM               = 0.95  # Momentum used by RMSProp
@@ -159,6 +160,10 @@ class DeepQAgent(object):
         self.t            = 0
         self.epsilon      = self.INITIAL_EPSILON
         self.epsilon_step = (self.INITIAL_EPSILON - self.FINAL_EPSILON) / self.EXPLORATION_STEPS
+
+        self.total_reward  = 0.0
+        self.total_q_max   = 0.0
+        self.duration      = 0
 
         self.input_shape  = input_shape
         self.nb_actions   = nb_actions
@@ -258,39 +263,11 @@ class DeepQAgent(object):
         """ This allows the agent to observe the output of doing the action it selected through act() on the old_state
         """
         self.total_reward += reward
-        self.total_q_max  += np.max(self.q_values.eval(feed_dict={self.s: old_state}))
-        self.duration     += 1
 
         # If done, reset short term memory (ie. History)
         if done:
             # Write summary
-            if self.t >= self.INITIAL_REPLAY_SIZE:
-                stats = [self.total_reward, self.total_q_max / float(self.duration),
-                        self.duration, self.total_loss / (float(self.duration) / float(self.TRAIN_INTERVAL))]
-                for i in range(len(stats)):
-                    self.sess.run(self.update_ops[i], feed_dict={
-                        self.summary_placeholders[i]: float(stats[i])
-                    })
-                summary_str = self.sess.run(self.summary_op)
-                self.summary_writer.add_summary(summary_str, self.episode + 1)
-
-            # Debug
-            if self.t < self.INITIAL_REPLAY_SIZE:
-                mode = 'random'
-            elif self.INITIAL_REPLAY_SIZE <= self.t < self.INITIAL_REPLAY_SIZE + self.EXPLORATION_STEPS:
-                mode = 'explore'
-            else:
-                mode = 'exploit'
-            print('EPISODE: {0:6d} / TIMESTEP: {1:8d} / DURATION: {2:5d} / EPSILON: {3:.5f} / TOTAL_REWARD: {4:3.0f} / AVG_MAX_Q: {5:2.4f} / AVG_LOSS: {6:.5f} / MODE: {7}'.format(
-                self.episode + 1, self.t, self.duration, self.epsilon,
-                self.total_reward, self.total_q_max / float(self.duration),
-                self.total_loss / (float(self.duration) / float(self.TRAIN_INTERVAL)), mode))
-
-            self.total_reward = 0
-            self.total_q_max  = 0
-            self.total_loss   = 0
-            self.duration     = 0
-            self.episode      += 1
+            # TODO:
 
             # Reset the short term memory
             self._history.reset()
@@ -309,8 +286,8 @@ class DeepQAgent(object):
         The Target Network is a frozen copy of the Action Value Network updated as regular intervals.
         """
         agent_step = self._num_actions_taken
-        if agent_step >= self._train_after:
-            if (agent_step % self._train_interval) == 0:
+        if agent_step >= self.TRAIN_AFTER:
+            if (agent_step % self.TRAIN_INTERVAL) == 0:
                 # Clip all positive rewards at 1 and all negative rewards at -1, leaving 0 rewards unchanged
                 # reward = np.clip(reward, -1, 1)
 
@@ -378,20 +355,21 @@ def get_iou(bb1, bb2):
     Calculate the Intersection over Union (IoU) of two bounding boxes.
         The (x1, y1) position is at the top left corner,
         The (x2, y2) position is at the bottom right corner
+        Cartesian Co-ordinate System with origin at center of frame right and top are positive axis
     """
 
     assert bb1['x1'] < bb1['x2']
-    assert bb1['y1'] < bb1['y2']
+    assert bb1['y1'] > bb1['y2']
     assert bb2['x1'] < bb2['x2']
-    assert bb2['y1'] < bb2['y2']
+    assert bb2['y1'] > bb2['y2']
 
     # determine the coordinates of the intersection rectangle
     x_left   = max(bb1['x1'], bb2['x1'])
-    y_top    = max(bb1['y1'], bb2['y1'])
+    y_top    = min(bb1['y1'], bb2['y1'])
     x_right  = min(bb1['x2'], bb2['x2'])
-    y_bottom = min(bb1['y2'], bb2['y2'])
+    y_bottom = max(bb1['y2'], bb2['y2'])
 
-    if x_right < x_left or y_bottom < y_top:
+    if x_right < x_left or y_bottom > y_top:
         return 0.0
 
     # The intersection of two axis-aligned bounding boxes is always an
@@ -411,7 +389,7 @@ def get_iou(bb1, bb2):
     return iou
 
 def interpret_action(action):
-    scaling_factor = 0.25
+    scaling_factor = 0.1
     if action == 0:
         quad_offset = (0, 0, 0)
     elif action == 1:
@@ -433,19 +411,19 @@ def compute_reward(state, collision_info, max_dist):
     ''' Compute reward function which is scaled sumation of euclidean distance of center of bbox from center
     of frame and IoU of bbox and a imaginary box centered at frame center with dimensions THRESH_H x THRESH_W
     '''
-    THRESH_W = 25.
-    THRESH_H = 25.
+    THRESH_W = 299.0
+    THRESH_H = 299.0
 
     SCALE = 2.
 
     if collision_info.has_collided:
         reward = -10
     else:
-        x = state.POS_X
-        y = state.POS_Y
+        x = state[3]
+        y = state[4]
 
-        w = state.WIDTH
-        h = state.HEIGHT
+        w = state[5]
+        h = state[6]
 
         dist = np.linalg.norm([x, y])/max_dist
         bb1 = {
@@ -462,6 +440,9 @@ def compute_reward(state, collision_info, max_dist):
         }
         iou  = get_iou(bb1, bb2)
         reward = (dist + iou)*SCALE
+        print "#################################################################################"
+        print "######### Euclidean Distance:", dist, "IoU:", iou, "Scale:", SCALE, "###########"
+        print "#################################################################################"
 
     return reward
 
@@ -483,6 +464,7 @@ if __name__=='__main__':
     input_dims       = 8
     num_actions      = 7
     num_buff_frames  = 4
+    max_dist         = 360.0
 
     agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 
@@ -498,11 +480,13 @@ if __name__=='__main__':
         action      = agent.act(current_state)
         quad_offset = interpret_action(action)
 
-        new_state, collision_info = env.step(quad_offset, duration=5)
-        if not new_state:
+        try:
+            new_state, collision_info = env.step(quad_offset, duration=2)
+        except:
+            print "Restart the Game"
             restart_game()
 
-        reward = compute_reward(new_state, collision_info)
+        reward = compute_reward(new_state, collision_info, max_dist)
         done   = is_done(reward)
         if done:
             restart_game()

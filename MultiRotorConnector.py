@@ -54,4 +54,4 @@ class MultiRotorConnector:
                                     quad_vel.z_val + offset[2],
                                     duration
                                   )
-        time.sleep(0.5)
+        # time.sleep(0.5)
