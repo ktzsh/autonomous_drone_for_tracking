@@ -25,11 +25,12 @@ class CarConnector:
         if not self.api_control:
             self.connect()
         state = self._connector.getCarState()
-        print state
-        return state
+        pos = state.kinematics_true.position
+        ort = state.kinematics_true.orientation
+        return pos, ort
 
-    def reset():
+    def reset(self):
         self._connector.reset()
-        state = self.get_position()
+        pos, ort = self.get_position()
         self.disconnect()
-        return state
+        return pos, ort

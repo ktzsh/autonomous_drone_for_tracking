@@ -1,3 +1,4 @@
+import time
 import numpy as np
 
 from Detector import Detector
@@ -66,15 +67,18 @@ class Environment:
         return 1
 
     def reset(self):
-        # TODO - Implement Reset Environment
-        # Get the position of car and take the multirotor above it
-        car_pos = _car_connector.reset()
-        _connector.moveToPosition()
-        
+        car_pos, car_ort = self._car_connector.reset()
+
+        offset = (car_pos.x_val, car_pos.y_val, self._connector.INIT_Z)
+        self._connector.move_to_position(offset)
+        # time.sleep(3)
+
+        # offset = (car_ort.x_val, car_ort.y_val, car_ort.z_val)
+        # self._connector.move_by_angle(offset, self._connector.INIT_Z)
+        # time.sleep(3)
+
         _state = State()
-        flag = self.update(_state)
-        if not flag:
-            raise Exception('Unable to detect any Object')
+        _ = self.update(_state)
         return self.state_to_array(_state)
 
     def step(self, action, duration=5):

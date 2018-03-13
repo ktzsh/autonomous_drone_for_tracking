@@ -57,3 +57,6 @@ class MultiRotorConnector:
         # time.sleep(0.5)
     def move_to_position(self, offset, speed=5):
         self.client.moveToPosition(offset[0], offset[1], offset[2], 5)
+
+    def move_by_angle(self, offset, z, duration=5):
+        self.client.moveByAngle(offset[0], offset[1], z, offset[2], duration)
