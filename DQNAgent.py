@@ -389,7 +389,7 @@ def get_iou(bb1, bb2):
     return iou
 
 def interpret_action(action):
-    scaling_factor = 0.1
+    scaling_factor = 0.25
     if action == 0:
         quad_offset = (0, 0, 0)
     elif action == 1:
@@ -407,7 +407,7 @@ def interpret_action(action):
 
     return quad_offset
 
-def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=thresh_dim):
+def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=(160,320)):
     ''' Compute reward function which is scaled sumation of euclidean distance of center of bbox from center
     of frame and IoU of bbox and a imaginary box centered at frame center with dimensions THRESH_H x THRESH_W
     '''
@@ -468,11 +468,10 @@ if __name__=='__main__':
     im_height        = 720
     thresh_dim       = (160, 320)
 
-    ymin, xmin, ymax, xmax
-    gt_box = np.array([ im_height/2 - thresh_dim[1]/2,
-                        im_width/2 - thresh_dim[0]/2,
-                        im_height/2 + thresh_dim[1]/2,
-                        im_width/2 + thresh_dim[0]/2])
+    gt_box = np.array([ (im_height/2.0 - thresh_dim[1]/2.0) / im_height,
+                        (im_width/2.0 - thresh_dim[0]/2.0) / im_width,
+                        (im_height/2.0 + thresh_dim[1]/2.0) / im_height,
+                        (im_width/2.0 + thresh_dim[0]/2.0) / im_width])
 
     agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 

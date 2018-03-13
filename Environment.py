@@ -2,6 +2,7 @@ import numpy as np
 
 from Detector import Detector
 from MultiRotorConnector import MultiRotorConnector
+from CarConnector import CarConnector
 
 class State():
     VEL_X    = None
@@ -16,9 +17,10 @@ class State():
 
 class Environment:
     def __init__(self, gt_box=None):
-        self.gt_box     = gt_box
-        self._connector = MultiRotorConnector()
-        self._detector  = Detector()
+        self.gt_box         = gt_box
+        self._connector     = MultiRotorConnector()
+        self._car_connector = CarConnector()
+        self._detector      = Detector()
 
     def state_to_array(self, state):
         out = np.zeros((8,), dtype='float32')
@@ -66,6 +68,9 @@ class Environment:
     def reset(self):
         # TODO - Implement Reset Environment
         # Get the position of car and take the multirotor above it
+        car_pos = _car_connector.reset()
+        _connector.moveToPosition()
+        
         _state = State()
         flag = self.update(_state)
         if not flag:
