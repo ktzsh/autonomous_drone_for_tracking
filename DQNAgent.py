@@ -407,13 +407,12 @@ def interpret_action(action):
 
     return quad_offset
 
-def compute_reward(state, collision_info, max_dist):
+def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=thresh_dim):
     ''' Compute reward function which is scaled sumation of euclidean distance of center of bbox from center
     of frame and IoU of bbox and a imaginary box centered at frame center with dimensions THRESH_H x THRESH_W
     '''
-    THRESH_W = 299.0
-    THRESH_H = 299.0
 
+    THRESH_W, THRESH_H = thresh_dim
     SCALE = 2.
 
     if collision_info.has_collided:
@@ -456,15 +455,24 @@ def restart_game():
     # TODO - Implement Restart
     # Call Environment reset - Check TODO in env.reset()
     # Restart the game by making LOAD_NETWORK true if chkpnt exists
-    print "Restart the Game(NOT IMPLEMENTED)"
-    pass
+    return env.reset()
+
 
 if __name__=='__main__':
     # Make RL agent
     input_dims       = 8
     num_actions      = 7
     num_buff_frames  = 4
-    max_dist         = 360.0
+    max_dist         = 735 # sqrt( sqr(360) + sqr(640))
+    im_width         = 1280
+    im_height        = 720
+    thresh_dim       = (160, 320)
+
+    ymin, xmin, ymax, xmax
+    gt_box = np.array([ im_height/2 - thresh_dim[1]/2,
+                        im_width/2 - thresh_dim[0]/2,
+                        im_height/2 + thresh_dim[1]/2,
+                        im_width/2 + thresh_dim[0]/2])
 
     agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 
@@ -473,7 +481,7 @@ if __name__=='__main__':
     current_step = 0
     max_steps    = epoch * 250000
 
-    env           = Environment()
+    env           = Environment(gt_box=gt_box)
     current_state = env.reset()
 
     while True:
@@ -482,17 +490,18 @@ if __name__=='__main__':
 
         try:
             new_state, collision_info = env.step(quad_offset, duration=2)
+            reward = compute_reward(new_state, collision_info, max_dist=max_dist, thresh_dim=thresh_dim)
+            done   = is_done(reward)
         except:
-            print "Restart the Game"
-            restart_game()
+            reward = -100
+            done   = 1
 
-        reward = compute_reward(new_state, collision_info, max_dist)
-        done   = is_done(reward)
-        if done:
-            restart_game()
         print('Action, Reward, Done:', action, reward, done)
-
         agent.observe(current_state, action, reward, done)
         agent.train()
+
+        if done:
+            print "Detection Failed or too Negative Reward...Restart the Game"
+            new_state = restart_game()
 
         current_state = new_state

@@ -142,11 +142,15 @@ class Detector:
             import matplotlib.image as mpimg
             mpimg.imsave(image_path.split('/')[-1], image_np)
 
-    def detect(self, image_np):
+    def detect(self, image_np, gt_box=None):
         image = image_np.copy()
         # image_np_expanded = np.expand_dims(image_np, axis=0)
         output_dict = self.run_inference_for_single_image(image_np)
 
+        if gt_box:
+            output_dict['detection_boxes'] = np.append(output_dict['detection_boxes'], [gt_box], axis=0)
+            output_dict['detection_scores'] = np.append(output_dict['detection_scores'], 1.0)
+            output_dict['detection_classes'] = np.append(output_dict['detection_classes'], 0)
         # Visualization of the results of a detection.
         vis_util.visualize_boxes_and_labels_on_image_array( image,
                                                             output_dict['detection_boxes'],
@@ -156,8 +160,8 @@ class Detector:
                                                             min_score_thresh=self.min_score_thresh,
                                                             instance_masks=output_dict.get('detection_masks'),
                                                             use_normalized_coordinates=True,
-                                                            skip_scores=False,
-                                                            skip_labels=False,
+                                                            skip_scores=True,
+                                                            skip_labels=True,
                                                             line_thickness=2)
 
         # To Ensure that figure does not appear again on foreground and stays in background

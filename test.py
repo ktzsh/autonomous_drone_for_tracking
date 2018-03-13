@@ -1,62 +1,36 @@
 import time
-# from Environment import Environment
-from MultiRotorConnector import MultiRotorConnector
 
-# env = Environment()
-# while True:
-#     current_state = env.reset()
-#     time.sleep(5)
+def test_car_reset():
+    from CarConnector import CarConnector
+    connector = CarConnector()
+    state = connector.reset()
 
-connector = MultiRotorConnector()
-time.sleep(4)
-_ = connector.get_frame(path='1.png')
-position = connector.get_position()
-x = position.x_val
-y = position.y_val
-z = position.z_val
-print x, y, z
+def test_detection():
+    from Environment import Environment
+    env = Environment()
+    while True:
+        current_state = env.reset()
+        time.sleep(1)
 
-connector.move_to_position([x, y, z])
-time.sleep(4)
-_ = connector.get_frame(path='1.png')
-position = connector.get_position()
-x = position.x_val
-y = position.y_val
-z = position.z_val
-print x, y, z
+def test_images_at_altitude():
+    from MultiRotorConnector import MultiRotorConnector
+    connector = MultiRotorConnector()
+    time.sleep(3)
 
-connector.move_to_position([x, y, z+5])
-time.sleep(4)
-_ = connector.get_frame(path='2.png')
-position = connector.get_position()
-x = position.x_val
-y = position.y_val
-z = position.z_val
-print x, y, z
+    _ = connector.get_frame(path='dummy.png')
+    position = connector.get_position()
+    x_val = position.x_val
+    y_val = position.y_val
+    z_val = position.z_val
+    print "Initial Positions:", x_val, y_val, z_val
 
-connector.move_to_position([x, y, z+5])
-time.sleep(4)
-_ = connector.get_frame(path='3.png')
-position = connector.get_position()
-x = position.x_val
-y = position.y_val
-z = position.z_val
-print x, y, z
+    for i,z in enumerate([z_val-10, z_val-5, z_val, z_val+5, z_val+10]):
+        connector.move_to_position([x_val, y_val, z])
+        time.sleep(3)
+        path = str(i+1) + '.png'
+        _ = connector.get_frame(path=path)
+        print "\tTest Case:", x_val, y_val, z, path
 
-connector.move_to_position([x, y, z-15])
-time.sleep(4)
-_ = connector.get_frame(path='4.png')
-position = connector.get_position()
-x = position.x_val
-y = position.y_val
-z = position.z_val
-print x, y, z
+if __name__=='__main__':
 
-connector.move_to_position([x, y, z-5])
-time.sleep(4)
-_ = connector.get_frame(path='5.png')
-position = connector.get_position()
-x = position.x_val
-y = position.y_val
-z = position.z_val
-print x, y, z
+    test_car_reset()

@@ -15,7 +15,8 @@ class State():
     pass
 
 class Environment:
-    def __init__(self):
+    def __init__(self, gt_box=None):
+        self.gt_box     = gt_box
         self._connector = MultiRotorConnector()
         self._detector  = Detector()
 
@@ -41,7 +42,7 @@ class Environment:
         state.ALTITUDE = position.z_val
 
         frame        = self._connector.get_frame()
-        output       = self._detector.detect(frame)
+        output       = self._detector.detect(frame, self.gt_box)
         if not output:
             return None
 
