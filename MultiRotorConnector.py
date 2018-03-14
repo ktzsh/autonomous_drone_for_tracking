@@ -11,8 +11,8 @@ from AirSimClient import *
 class MultiRotorConnector:
     client = None
 
-    INIT_X = -2.4
-    INIT_Y = -3.1
+    INIT_X = -0
+    INIT_Y = -0
     INIT_Z = -15
 
     def __init__(self):
@@ -20,7 +20,6 @@ class MultiRotorConnector:
         self.client.confirmConnection()
         self.client.enableApiControl(True)
         self.client.armDisarm(True)
-        self.client.reset()
 
         self.client.takeoff()
         self.client.moveToPosition(self.INIT_X, self.INIT_Y, self.INIT_Z, 5)

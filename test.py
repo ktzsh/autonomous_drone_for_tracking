@@ -25,8 +25,8 @@ def test_get_images_at_positions():
 
     count = 0
     for i,z in enumerate([-9, -6, -3, 0, 3, 6, 9]):
-        for j,x in enumerate([-3, 0, 3]):
-            for k,y in enumerate([-3, 0, 3]):
+        for j,x in enumerate([0, 5, -5]):
+            for k,y in enumerate([0, 5, -5]):
                 connector.move_to_position([x_val+x, y_val+y, z_val+z])
                 time.sleep(1)
                 path = 'TF_ObjectDetection/data/orig_data/' + str(count) + '.png'

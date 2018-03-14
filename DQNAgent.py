@@ -466,7 +466,7 @@ if __name__=='__main__':
     max_dist         = 735 # sqrt( sqr(360) + sqr(640))
     im_width         = 1280
     im_height        = 720
-    thresh_dim       = (200, 320)
+    thresh_dim       = (120, 250)
 
     gt_box = np.array([ (im_height/2.0 - thresh_dim[1]/2.0) / im_height,
                         (im_width/2.0 - thresh_dim[0]/2.0) / im_width,
