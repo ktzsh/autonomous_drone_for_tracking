@@ -4,12 +4,15 @@ import numpy as np
 import xml.etree.ElementTree as ET
 
 from PIL import Image
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
 import tensorflow as tf
 from object_detection.utils import dataset_util
 
 flags = tf.app.flags
 flags.DEFINE_string('output_path', '', 'Path to output TFRecord')
+flags.DEFINE_string('flag', '', 'train or val')
 FLAGS = flags.FLAGS
 
 
@@ -53,6 +56,7 @@ def create_tf_example(image, bbox, im_shape):
 def main(_):
     writer = tf.python_io.TFRecordWriter(FLAGS.output_path)
 
+    sometimes = lambda aug: iaa.Sometimes(0.5, aug)
     seq = iaa.Sequential(
     [
         iaa.Fliplr(0.5), # horizontally flip 50% of all images
@@ -74,12 +78,12 @@ def main(_):
     random_order=True)
 
     ann              = None
-    num_orig_samples = 10
+    num_orig_samples = 25
     num_batches      = 1000
     images, bboxs    = [], []
 
-    for i in range num_orig_samples:
-        path = 'data/orig_data/' + str(i) + '.xml'
+    for i in range(num_orig_samples):
+        path = 'data/orig_data/' + FLAGS.flag + '/' + str(i).zfill(4) + '.xml'
         tree = ET.parse(path)
         root = tree.getroot()
 
@@ -91,7 +95,7 @@ def main(_):
         ymin = int(bndbox.find('ymin').text)
         ymax = int(bndbox.find('ymax').text)
 
-        image = np.asarray(Image.open('data/orig_data/' + str(i).zfill(2) + '.png'), dtype='uint8')
+        image = np.asarray(Image.open('data/orig_data/' + FLAGS.flag + '/' + str(i).zfill(4) + '.png'), dtype='uint8')
         bbox  = ia.BoundingBoxesOnImage([ia.BoundingBox(x1=xmin, y1=ymin, x2=xmax, y2=ymax)], shape=image.shape)
 
         images.append(image)
@@ -105,8 +109,15 @@ def main(_):
         for j, (image, bbox) in enumerate(zip(aug_images, aug_bboxs)):
 
             result   = Image.fromarray(image)
-            out_path = 'data/' + str(i*num_orig_samples+j).zfill(5) + '.png'
+            out_path = 'data/' + str(i*num_orig_samples+j).zfill(6) + '.png'
             result.save(out_path)
+
+            vis_util.draw_bounding_boxes_on_image_array( image,
+                                                         np.array([bbox]),
+                                                         color='black',
+                                                         thickness=4)
+            imgplot = plt.imshow(image)
+            plt.show()
 
             print bbox
             # bbox = ...

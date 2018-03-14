@@ -413,7 +413,7 @@ def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=(160,320)):
     '''
 
     THRESH_W, THRESH_H = thresh_dim
-    SCALE = 2.
+    SCALE = 4.
 
     if collision_info.has_collided:
         reward = -10
@@ -439,9 +439,7 @@ def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=(160,320)):
         }
         iou  = get_iou(bb1, bb2)
         reward = (dist + iou)*SCALE
-        print "#################################################################################"
-        print "######### Euclidean Distance:", dist, "IoU:", iou, "Scale:", SCALE, "###########"
-        print "#################################################################################"
+        print "Euclidean Distance:", dist, "\nIoU:", iou, "\nScale:", SCALE,
 
     return reward
 
@@ -495,7 +493,7 @@ if __name__=='__main__':
             reward = -100
             done   = 1
 
-        print('Action, Reward, Done:', action, reward, done)
+        print "Action:", action, "\nReward:", reward, "\nDone:", done
         agent.observe(current_state, action, reward, done)
         agent.train()
 
