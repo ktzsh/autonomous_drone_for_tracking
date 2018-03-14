@@ -12,10 +12,9 @@ def test_detection():
         current_state = env.reset()
         time.sleep(1)
 
-def test_images_at_altitude():
+def test_get_images_at_positions():
     from MultiRotorConnector import MultiRotorConnector
     connector = MultiRotorConnector()
-    time.sleep(3)
 
     _ = connector.get_frame(path='dummy.png')
     position = connector.get_position()
@@ -24,13 +23,17 @@ def test_images_at_altitude():
     z_val = position.z_val
     print "Initial Positions:", x_val, y_val, z_val
 
-    for i,z in enumerate([z_val-10, z_val-5, z_val, z_val+5, z_val+10]):
-        connector.move_to_position([x_val, y_val, z])
-        time.sleep(3)
-        path = str(i+1) + '.png'
-        _ = connector.get_frame(path=path)
-        print "\tTest Case:", x_val, y_val, z, path
+    count = 0
+    for i,z in enumerate([-9, -6, -3, 0, 3, 6, 9]):
+        for j,x in enumerate([-3, 0, 3]):
+            for k,y in enumerate([-3, 0, 3]):
+                connector.move_to_position([x_val+x, y_val+y, z_val+z])
+                time.sleep(1)
+                path = 'TF_ObjectDetection/data/orig_data/' + str(count) + '.png'
+                count += 1
+                _ = connector.get_frame(path=path)
+                print "\tTest Case:", x_val+x, y_val+y, z_val+z, path
 
 if __name__=='__main__':
 
-    test_car_reset()
+    test_get_images_at_positions()
