@@ -9,6 +9,7 @@ import matplotlib.image as mpimg
 
 import tensorflow as tf
 from object_detection.utils import dataset_util
+from object_detection.utils import visualization_utils as vis_util
 
 flags = tf.app.flags
 flags.DEFINE_string('output_path', '', 'Path to output TFRecord')
@@ -27,10 +28,10 @@ def create_tf_example(image, bbox, im_shape):
     filename     = image # Filename of the image. Empty if image is not from file
     image_format = b'png'
 
-    xmins = [bbox[0]] # List of normalized left x coordinates in bounding box (1 per box)
-    xmaxs = [bbox[1]] # List of normalized right x coordinates in bounding box (1 per box)
-    ymins = [bbox[2]] # List of normalized top y coordinates in bounding box (1 per box)
-    ymaxs = [bbox[3]] # List of normalized bottom y coordinates in bounding box (1 per box)
+    xmins = [float(bbox.x1)/im_shape[1]] # List of normalized left x coordinates in bounding box (1 per box)
+    xmaxs = [float(bbox.x2)/im_shape[1]] # List of normalized right x coordinates in bounding box (1 per box)
+    ymins = [float(bbox.y1)/im_shape[0]] # List of normalized top y coordinates in bounding box (1 per box)
+    ymaxs = [float(bbox.y2)/im_shape[0]] # List of normalized bottom y coordinates in bounding box (1 per box)
 
     classes      = [1] # List of integer class id of bounding box (1 per box)
     classes_text = ['car'] # List of string class name of bounding box (1 per box)
@@ -63,13 +64,13 @@ def main(_):
         iaa.Flipud(0.2), # vertically flip 20% of all images
         # crop images by -10% to 20% of their height/width
         sometimes(iaa.CropAndPad(
-            percent=(-0.1, 0.2),
+            percent=(-0.05, 0.1),
             pad_mode=ia.ALL,
             pad_cval=(0, 255)
         )),
         sometimes(iaa.Affine(
-            translate_percent={"x": (-0.5, 0.5), "y": (-0.5, 0.5)}, # translate by -50 to +50 percent (per axis)
-            rotate=(-90, 90), # rotate by -90 to +90 degrees
+            translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)}, # translate by -50 to +50 percent (per axis)
+            rotate=(-45, 45), # rotate by -90 to +90 degrees
             order=[0, 1], # use nearest neighbour or bilinear interpolation (fast)
             cval=(0, 255), # if mode is constant, use a cval between 0 and 255
             mode=ia.ALL # use any of scikit-image's warping modes (see 2nd image from the top for examples)
@@ -79,7 +80,7 @@ def main(_):
 
     ann              = None
     num_orig_samples = 25
-    num_batches      = 1000
+    num_batches      = 100
     images, bboxs    = [], []
 
     for i in range(num_orig_samples):
@@ -88,38 +89,60 @@ def main(_):
         root = tree.getroot()
 
         obj = root.findall('object')
-        bndbox = obj.find('bndbox')
+        bndbox = obj[0].find('bndbox')
 
         xmin = int(bndbox.find('xmin').text)
         xmax = int(bndbox.find('xmax').text)
         ymin = int(bndbox.find('ymin').text)
         ymax = int(bndbox.find('ymax').text)
 
+        #bbox2 = [xmin, ymin, xmax, ymax]
+
         image = np.asarray(Image.open('data/orig_data/' + FLAGS.flag + '/' + str(i).zfill(4) + '.png'), dtype='uint8')
         bbox  = ia.BoundingBoxesOnImage([ia.BoundingBox(x1=xmin, y1=ymin, x2=xmax, y2=ymax)], shape=image.shape)
 
+
+            
+        print str(bbox)
         images.append(image)
         bboxs.append(bbox)
+        #image_copy = image.copy()
+        #print xmin, xmax, ymin, ymax , image.shape[0], image.shape[1] 
+
+        #vis_util.draw_bounding_boxes_on_image_array( image_copy,
+        #                                                 np.array([[float(ymin)/image.shape[0], float(xmin)/image.shape[1], float(ymax)/image.shape[0], float(xmax)/image.shape[1] ]]),
+        #                                                 color='yellow',
+        #                                                thickness=4)
+
+       	#imgplot = plt.imshow(image_copy)
+        #plt.show()
+
+
+
 
     for i in range(num_batches):
         seq_det    = seq.to_deterministic()
         aug_images = seq_det.augment_images(images)
         aug_bboxs  = seq_det.augment_bounding_boxes(bboxs)
 
-        for j, (image, bbox) in enumerate(zip(aug_images, aug_bboxs)):
+        for j, (image_np, abbox) in enumerate(zip(aug_images, aug_bboxs)):
 
+        	#aug_bboxs[]
+            bbox = abbox.bounding_boxes[0]
             result   = Image.fromarray(image)
             out_path = 'data/' + str(i*num_orig_samples+j).zfill(6) + '.png'
-            result.save(out_path)
+            #result.save(out_path)
 
-            vis_util.draw_bounding_boxes_on_image_array( image,
-                                                         np.array([bbox]),
-                                                         color='black',
-                                                         thickness=4)
-            imgplot = plt.imshow(image)
-            plt.show()
+            print bbox.x1, bbox.y1, bbox.x2, bbox.y2
+            image = image_np.copy()
+            #vis_util.draw_bounding_boxes_on_image_array( image,
+            #                                             np.array([[ float(bbox.y1)/image.shape[0], float(bbox.x1)/image.shape[1], float(bbox.y2)/image.shape[0], float(bbox.x2)/image.shape[1]]]),
+            #                                             color='yellow',
+            #                                             thickness=4)
+            #imgplot = plt.imshow(image)
+            #plt.show()
 
-            print bbox
+            
             # bbox = ...
 
             tf_example = create_tf_example(out_path, bbox, image.shape)
