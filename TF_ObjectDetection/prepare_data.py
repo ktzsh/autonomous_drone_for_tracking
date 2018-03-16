@@ -111,8 +111,6 @@ def main(_):
         #plt.show()
 
 
-
-
     for i in range(num_batches):
         seq_det    = seq.to_deterministic()
         aug_images = seq_det.augment_images(images)
