@@ -25,28 +25,19 @@ from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as vis_util
 
 class Detector:
-    MODEL_NAME = 'faster_rcnn_inception_v2_coco_2018_01_28'
-    MODEL_FILE = MODEL_NAME + '.tar.gz'
+    MODEL_NAME = 'ssd_mobilenet_v1_coco'
 
-    NUM_CLASSES    = 90
-    PATH_TO_CKPT   = MODEL_NAME + '/frozen_inference_graph.pb'
-    DOWNLOAD_BASE  = 'http://download.tensorflow.org/models/object_detection/'
-    PATH_TO_LABELS = os.path.join('TF_ObjectDetection/object_detection/data', 'mscoco_label_map.pbtxt')
+    NUM_CLASSES    = 1
+    PATH_TO_CKPT   = 'TF_ObjectDetection/output/frozen_inference_graph.pb'
+    PATH_TO_LABELS = os.path.join('TF_ObjectDetection/output', 'label_map.pbtxt')
 
 
     fig              = None
-    min_score_thresh = 0.7
+    min_score_thresh = 0.1
 
     def __init__(self):
-        if not os.path.isfile(self.MODEL_FILE):
-            opener = urllib.request.URLopener()
-            opener.retrieve(self.DOWNLOAD_BASE + self.MODEL_FILE, self.MODEL_FILE)
-            tar_file = tarfile.open(self.MODEL_FILE)
-
-            for file in tar_file.getmembers():
-                file_name = os.path.basename(file.name)
-                if 'frozen_inference_graph.pb' in file_name:
-                    tar_file.extract(file, os.getcwd())
+        if not os.path.isfile(self.PATH_TO_CKPT):
+            raise Exception('Model File not Found')
 
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
@@ -162,8 +153,8 @@ class Detector:
                                                             min_score_thresh=self.min_score_thresh,
                                                             instance_masks=output_dict.get('detection_masks'),
                                                             use_normalized_coordinates=True,
-                                                            skip_scores=True,
-                                                            skip_labels=True,
+                                                            skip_scores=False,
+                                                            skip_labels=False,
                                                             line_thickness=4)
 
         # To Ensure that figure does not appear again on foreground and stays in background
@@ -182,12 +173,12 @@ class Detector:
         classes = output_dict['detection_classes']
         scores  = output_dict['detection_scores']
 
-        im_width, im_height = image_np.shape[0:2]
+        im_height, im_width = image_np.shape[0:2]
         for i in range(bboxes.shape[0]):
           if scores is None or scores[i] > self.min_score_thresh:
             if classes[i] in self.category_index.keys():
                 class_name = self.category_index[classes[i]]['name']
-                if class_name=='traffic light':
+                if class_name=='car':
                     box = tuple(bboxes[i].tolist())
                     ymin, xmin, ymax, xmax = box
                     left   = xmin * im_width

@@ -23,9 +23,9 @@ def create_tf_example(image, bbox, im_shape):
     with tf.gfile.GFile(image, 'rb') as fid:
         encoded_image_data = fid.read()  # Encoded image bytes
 
-    height       = im_shape[1] # Image height
-    width        = im_shape[0] # Image width
-    filename     = image # Filename of the image. Empty if image is not from file
+    height       = im_shape[0] # Image height
+    width        = im_shape[1] # Image width
+    filename     = None # Filename of the image. Empty if image is not from file
     image_format = b'png'
 
     xmins = [float(bbox.x1)/im_shape[1]] # List of normalized left x coordinates in bounding box (1 per box)
@@ -102,12 +102,12 @@ def main(_):
         bbox  = ia.BoundingBoxesOnImage([ia.BoundingBox(x1=xmin, y1=ymin, x2=xmax, y2=ymax)], shape=image.shape)
 
 
-            
+
         print str(bbox)
         images.append(image)
         bboxs.append(bbox)
         #image_copy = image.copy()
-        #print xmin, xmax, ymin, ymax , image.shape[0], image.shape[1] 
+        #print xmin, xmax, ymin, ymax , image.shape[0], image.shape[1]
 
         #vis_util.draw_bounding_boxes_on_image_array( image_copy,
         #                                                 np.array([[float(ymin)/image.shape[0], float(xmin)/image.shape[1], float(ymax)/image.shape[0], float(xmax)/image.shape[1] ]]),
@@ -142,7 +142,7 @@ def main(_):
             #imgplot = plt.imshow(image)
             #plt.show()
 
-            
+
             # bbox = ...
 
             tf_example = create_tf_example(out_path, bbox, image.shape)
