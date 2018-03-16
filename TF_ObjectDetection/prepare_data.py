@@ -25,7 +25,7 @@ def create_tf_example(image, bbox, im_shape):
 
     height       = im_shape[0] # Image height
     width        = im_shape[1] # Image width
-    filename     = None # Filename of the image. Empty if image is not from file
+    filename     = image # Filename of the image. Empty if image is not from file
     image_format = b'png'
 
     xmins = [float(bbox.x1)/im_shape[1]] # List of normalized left x coordinates in bounding box (1 per box)
@@ -80,7 +80,7 @@ def main(_):
 
     ann              = None
     num_orig_samples = 25
-    num_batches      = 100
+    num_batches      = 1000
     images, bboxs    = [], []
 
     for i in range(num_orig_samples):
@@ -96,24 +96,17 @@ def main(_):
         ymin = int(bndbox.find('ymin').text)
         ymax = int(bndbox.find('ymax').text)
 
-        #bbox2 = [xmin, ymin, xmax, ymax]
 
         image = np.asarray(Image.open('data/orig_data/' + FLAGS.flag + '/' + str(i).zfill(4) + '.png'), dtype='uint8')
         bbox  = ia.BoundingBoxesOnImage([ia.BoundingBox(x1=xmin, y1=ymin, x2=xmax, y2=ymax)], shape=image.shape)
 
-
-
-        print str(bbox)
         images.append(image)
         bboxs.append(bbox)
         #image_copy = image.copy()
-        #print xmin, xmax, ymin, ymax , image.shape[0], image.shape[1]
-
         #vis_util.draw_bounding_boxes_on_image_array( image_copy,
         #                                                 np.array([[float(ymin)/image.shape[0], float(xmin)/image.shape[1], float(ymax)/image.shape[0], float(xmax)/image.shape[1] ]]),
         #                                                 color='yellow',
         #                                                thickness=4)
-
        	#imgplot = plt.imshow(image_copy)
         #plt.show()
 
@@ -129,12 +122,12 @@ def main(_):
 
         	#aug_bboxs[]
             bbox = abbox.bounding_boxes[0]
-            result   = Image.fromarray(image)
-            out_path = 'data/' + str(i*num_orig_samples+j).zfill(6) + '.png'
-            #result.save(out_path)
+            result   = Image.fromarray(image_np)
+            out_path = '/home/kshitiz/workspace/autonomous_drone_for_tracking/TF_ObjectDetection/data/' + \
+                        FLAGS.flag + '/' + str(i*num_orig_samples+j).zfill(6) + '.png'
+            result.save(out_path)
 
-            print bbox.x1, bbox.y1, bbox.x2, bbox.y2
-            image = image_np.copy()
+            #image = image_np.copy()
             #vis_util.draw_bounding_boxes_on_image_array( image,
             #                                             np.array([[ float(bbox.y1)/image.shape[0], float(bbox.x1)/image.shape[1], float(bbox.y2)/image.shape[0], float(bbox.x2)/image.shape[1]]]),
             #                                             color='yellow',
@@ -143,10 +136,11 @@ def main(_):
             #plt.show()
 
 
-            # bbox = ...
-
             tf_example = create_tf_example(out_path, bbox, image.shape)
             writer.write(tf_example.SerializeToString())
+
+        if i%10==0 and i!=0:
+            print "Number of batches processed", i
 
     writer.close()
 
