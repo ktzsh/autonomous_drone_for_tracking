@@ -392,20 +392,27 @@ def interpret_action(action):
     scaling_factor = 0.25
     if action == 0:
         quad_offset = (0, 0, 0)
+        name        = 'O'
     elif action == 1:
         quad_offset = (scaling_factor, 0, 0)
+        name        = '+X'
     elif action == 2:
         quad_offset = (0, scaling_factor, 0)
+        name        = '+Y'
     elif action == 3:
         quad_offset = (0, 0, scaling_factor)
+        name        = '+Z'
     elif action == 4:
         quad_offset = (-scaling_factor, 0, 0)
+        name        = '-X'
     elif action == 5:
         quad_offset = (0, -scaling_factor, 0)
+        name        = '-Y'
     elif action == 6:
         quad_offset = (0, 0, -scaling_factor)
+        name        = '-Z'
 
-    return quad_offset
+    return quad_offset, name
 
 def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=(160,320)):
     ''' Compute reward function which is scaled sumation of euclidean distance of center of bbox from center
@@ -439,7 +446,7 @@ def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=(160,320)):
         }
         iou  = get_iou(bb1, bb2)
         reward = (dist + iou)*SCALE
-        print "Euclidean Distance:", dist, "\nIoU:", iou, "\nScale:", SCALE,
+        print "Euc. Dist. :", dist, "\nIoU        :", iou, "\nScale      :", SCALE,
 
     return reward
 
@@ -461,10 +468,10 @@ if __name__=='__main__':
     input_dims       = 8
     num_actions      = 7
     num_buff_frames  = 4
-    max_dist         = 735 # sqrt( sqr(360) + sqr(640))
-    im_width         = 1280
-    im_height        = 720
-    thresh_dim       = (120, 250)
+    max_dist         = 550 # sqrt( sqr(960) + sqr(540))
+    im_width         = 960
+    im_height        = 540
+    thresh_dim       = (120, 145)
 
     gt_box = np.array([ (im_height/2.0 - thresh_dim[1]/2.0) / im_height,
                         (im_width/2.0 - thresh_dim[0]/2.0) / im_width,
@@ -482,8 +489,8 @@ if __name__=='__main__':
     current_state = env.reset()
 
     while True:
-        action      = agent.act(current_state)
-        quad_offset = interpret_action(action)
+        action            = agent.act(current_state)
+        quad_offset, name = interpret_action(action)
 
         try:
             new_state, collision_info = env.step(quad_offset, duration=2)
@@ -493,7 +500,7 @@ if __name__=='__main__':
             reward = -100
             done   = 1
 
-        print "Action:", action, "\nReward:", reward, "\nDone:", done
+        print "\nAction     :", action, name, "\nReward     :", reward, "\nDone       :", done
         agent.observe(current_state, action, reward, done)
         agent.train()
 

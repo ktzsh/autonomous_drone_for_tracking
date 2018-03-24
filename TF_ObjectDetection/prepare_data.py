@@ -80,7 +80,7 @@ def main(_):
 
     ann              = None
     num_orig_samples = 25
-    num_batches      = 1000
+    num_batches      = 100
     images, bboxs    = [], []
 
     for i in range(num_orig_samples):
@@ -97,7 +97,8 @@ def main(_):
         ymax = int(bndbox.find('ymax').text)
 
 
-        image = np.asarray(Image.open('data/orig_data/' + FLAGS.flag + '/' + str(i).zfill(4) + '.png'), dtype='uint8')
+        image = np.asarray(Image.open(('data/orig_data/' + FLAGS.flag + '/' + \
+                            str(i).zfill(4) + '.png')), dtype='uint8')
         bbox  = ia.BoundingBoxesOnImage([ia.BoundingBox(x1=xmin, y1=ymin, x2=xmax, y2=ymax)], shape=image.shape)
 
         images.append(image)

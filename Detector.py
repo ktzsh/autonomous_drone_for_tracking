@@ -18,8 +18,8 @@ python_path = os.path.abspath('TF_ObjectDetection/slim')
 sys.path.append(python_path)
 
 from object_detection.utils import ops as utils_ops
-if tf.__version__ < '1.4.0':
-    raise ImportError('Please upgrade your tensorflow installation to v1.4.* or later!')
+if tf.__version__ < '1.5.0':
+    raise ImportError('Please upgrade your tensorflow installation to v1.5.* or later!')
 
 from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as vis_util
@@ -28,12 +28,12 @@ class Detector:
     MODEL_NAME = 'ssd_mobilenet_v1_coco'
 
     NUM_CLASSES    = 1
-    PATH_TO_CKPT   = 'TF_ObjectDetection/output/frozen_inference_graph.pb'
-    PATH_TO_LABELS = os.path.join('TF_ObjectDetection/output', 'label_map.pbtxt')
+    PATH_TO_CKPT   = os.path.join('TF_ObjectDetection', MODEL_NAME, 'frozen_inference_graph.pb')
+    PATH_TO_LABELS = os.path.join('TF_ObjectDetection', 'label_map.pbtxt')
 
 
     fig              = None
-    min_score_thresh = 0.1
+    min_score_thresh = 0.25
 
     def __init__(self):
         if not os.path.isfile(self.PATH_TO_CKPT):
@@ -154,7 +154,7 @@ class Detector:
                                                             instance_masks=output_dict.get('detection_masks'),
                                                             use_normalized_coordinates=True,
                                                             skip_scores=False,
-                                                            skip_labels=False,
+                                                            skip_labels=True,
                                                             line_thickness=4)
 
         # To Ensure that figure does not appear again on foreground and stays in background
