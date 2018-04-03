@@ -132,29 +132,28 @@ class DeepQAgent(object):
     Nature 518. "Human-level control through deep reinforcement learning" (Mnih & al. 2015)
     """
 
-    NUM_EPISODES           = 12000  # Number of episodes the agent plays
+    NUM_EPISODES           = 1000  # Number of episodes the agent plays
     STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
     GAMMA                  = 0.99  # Discount factor
-    EXPLORATION_STEPS      = 1000000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+    EXPLORATION_STEPS      = 120  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
     INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
     FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
-    INITIAL_REPLAY_SIZE    = 20000  # Number of steps to populate the replay memory before training starts
-    NUM_REPLAY_MEMORY      = 400000  # Number of replay memory the agent uses for training
+    INITIAL_REPLAY_SIZE    = 120  # Number of steps to populate the replay memory before training starts
+    MEMORY_SIZE            = 5000  # Number of replay memory the agent uses for training
     BATCH_SIZE             = 32  # Mini batch size
-    TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
-    TRAIN_AFTER            = 4 # Number of Steps after which training starts
+    TARGET_UPDATE_INTERVAL = 120  # The frequency with which the target network is updated
+    TRAIN_AFTER            = 40 # Number of Steps after which training starts
     TRAIN_INTERVAL         = 4  # The agent selects 4 actions between successive updates
     LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
     MOMENTUM               = 0.95  # Momentum used by RMSProp
     MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
-    SAVE_INTERVAL          = 300000  # The frequency with which the network is saved
+    SAVE_INTERVAL          = 120  # The frequency with which the network is saved
     NO_OP_STEPS            = 30  # Maximum number of "do nothing" actions to be performed by the agent at the start of an episode
     LOAD_NETWORK           = False
     TRAIN                  = True
-    SAVE_NETWORK_PATH      = 'models/chkpnt'
-    SAVE_SUMMARY_PATH      = 'logs/summary.log'
+    SAVE_NETWORK_PATH      = 'models'
+    SAVE_SUMMARY_PATH      = 'logs'
     NUM_EPISODES_AT_TEST   = 30  # Number of episodes the agent plays at test time
-    MEMORY_SIZE            = 500000 # Size of replay memory
 
     def __init__(self, input_shape, nb_actions):
         self.t            = 0
@@ -163,7 +162,9 @@ class DeepQAgent(object):
 
         self.total_reward  = 0.0
         self.total_q_max   = 0.0
+        self.total_loss    = 0
         self.duration      = 0
+        self.episode       = 0
 
         self.input_shape  = input_shape
         self.nb_actions   = nb_actions
@@ -265,9 +266,47 @@ class DeepQAgent(object):
         self.total_reward += reward
 
         # If done, reset short term memory (ie. History)
+        self.total_reward += reward
+        env_with_history = self._history.value
+        self.total_q_max += np.max(self.q_values.eval(feed_dict={self.s: env_with_history.reshape((1,) + env_with_history.shape)}))
+        self.duration += 1
+
         if done:
             # Write summary
-            # TODO:
+            if self.t >= self.INITIAL_REPLAY_SIZE:
+                stats = [self.total_reward, self.total_q_max / float(self.duration),
+                        self.duration, self.total_loss / (float(self.duration) / float(self.TRAIN_INTERVAL))]
+                for i in range(len(stats)):
+                    self.sess.run(self.update_ops[i], feed_dict={
+                        self.summary_placeholders[i]: float(stats[i])
+                    })
+                summary_str = self.sess.run(self.summary_op)
+                self.summary_writer.add_summary(summary_str, self.episode + 1)
+
+            # Debug
+            if self.t < self.INITIAL_REPLAY_SIZE:
+                mode = 'random'
+            elif self.INITIAL_REPLAY_SIZE <= self.t < self.INITIAL_REPLAY_SIZE + self.EXPLORATION_STEPS:
+                mode = 'explore'
+            else:
+                mode = 'exploit'
+            print "-----EPISODE SUMMARY-----"
+            print "EPISODE    :", self.episode + 1, \
+                "\nTIMESTEP   :", self.t, \
+                "\nDURATION   :", self.duration, \
+                "\nEPSILON    :", self.epsilon, \
+                "\nTOTALREWARD:", self.total_reward, \
+                "\nAVG_MAX_Q  :", self.total_q_max / float(self.duration), \
+                "\nAVG_LOSS   :", self.total_loss / float(self.duration), \
+                "\nMODE       :", mode
+
+            print "-------------------------"
+
+            self.total_reward = 0
+            self.total_q_max = 0
+            self.total_loss = 0
+            self.duration = 0
+            self.episode += 1
 
             # Reset the short term memory
             self._history.reset()
@@ -290,6 +329,9 @@ class DeepQAgent(object):
             if (agent_step % self.TRAIN_INTERVAL) == 0:
                 # Clip all positive rewards at 1 and all negative rewards at -1, leaving 0 rewards unchanged
                 # reward = np.clip(reward, -1, 1)
+                print "Episode    :", self.episode, \
+                    "\nTimestep   :", self.t, \
+                    "\nAgent Step :", agent_step
 
                 if self.t >= self.INITIAL_REPLAY_SIZE:
                     # Train network
@@ -302,8 +344,8 @@ class DeepQAgent(object):
 
                     # Save network
                     if self.t % self.SAVE_INTERVAL == 0:
-                        save_path = self.saver.save(self.sess, self.SAVE_NETWORK_PATH, global_step=self.t)
-                        print('Successfully saved: ' + save_path)
+                        save_path = self.saver.save(self.sess, self.SAVE_NETWORK_PATH + '/chkpnt', global_step=self.t)
+                        print "Successfully saved:", save_path
 
                 self.t += 1
 
@@ -311,7 +353,7 @@ class DeepQAgent(object):
         ''' Extension to train() call - Batch generation and graph computations
         '''
         # Sample random minibatch of transition from replay memory
-        state_batch, action_batch, next_state_batch, reward_batch, terminal_batch = self._memory.minibatch(self._minibatch_size)
+        state_batch, action_batch, next_state_batch, reward_batch, terminal_batch = self._memory.minibatch(self.BATCH_SIZE)
 
         target_q_values_batch = self.target_q_values.eval(feed_dict={self.st: next_state_batch})
         y_batch               = reward_batch + (1 - terminal_batch) * self.GAMMA * np.max(target_q_values_batch, axis=1)
@@ -329,10 +371,10 @@ class DeepQAgent(object):
         episode_duration     = tf.Variable(0.)
         episode_avg_loss     = tf.Variable(0.)
 
-        tf.summary.scalar('Logs/Total Reward/Episode', episode_total_reward)
-        tf.summary.scalar('Logs/Average Max Q/Episode', episode_avg_max_q)
-        tf.summary.scalar('Logs/Duration/Episode', episode_duration)
-        tf.summary.scalar('Logs/Average Loss/Episode', episode_avg_loss)
+        tf.summary.scalar('logs/Total Reward/Episode', episode_total_reward)
+        tf.summary.scalar('logs/Average Max Q/Episode', episode_avg_max_q)
+        tf.summary.scalar('logs/Duration/Episode', episode_duration)
+        tf.summary.scalar('logs/Average Loss/Episode', episode_avg_loss)
 
         summary_vars         = [episode_total_reward, episode_avg_max_q, episode_duration, episode_avg_loss]
         summary_placeholders = [tf.placeholder(tf.float32) for _ in range(len(summary_vars))]
@@ -420,10 +462,11 @@ def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=(160,320)):
     '''
 
     THRESH_W, THRESH_H = thresh_dim
-    SCALE = 4.
+    SCALE_DIST = 1.
+    SCALE_IOU  = 10.
 
     if collision_info.has_collided:
-        reward = -10
+        reward = -2.0
     else:
         x = state[3]
         y = state[4]
@@ -445,21 +488,21 @@ def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=(160,320)):
                 'y2': 0 - THRESH_H/2
         }
         iou  = get_iou(bb1, bb2)
-        reward = (dist + iou)*SCALE
-        print "Euc. Dist. :", dist, "\nIoU        :", iou, "\nScale      :", SCALE,
+        reward = (1-dist)*SCALE_DIST + iou*SCALE_IOU
+        print "Distance   :", dist, \
+            "\nIoU        :", iou, \
+            "\nDist Reward:", (1-dist)*SCALE_DIST, \
+            "\nIoU Reward :", iou*SCALE_IOU
 
     return reward
 
 def is_done(reward):
     done = 0
-    if  reward <= -100:
+    if  reward <= -20.0:
         done = 1
     return done
 
 def restart_game():
-    # TODO - Implement Restart
-    # Call Environment reset - Check TODO in env.reset()
-    # Restart the game by making LOAD_NETWORK true if chkpnt exists
     return env.reset()
 
 
@@ -468,9 +511,9 @@ if __name__=='__main__':
     input_dims       = 8
     num_actions      = 7
     num_buff_frames  = 4
-    max_dist         = 550 # sqrt( sqr(960) + sqr(540))
-    im_width         = 960
-    im_height        = 540
+    max_dist         = 735 # sqrt( sqr(960) + sqr(540))
+    im_width         = 1280
+    im_height        = 720
     thresh_dim       = (120, 145)
 
     gt_box = np.array([ (im_height/2.0 - thresh_dim[1]/2.0) / im_height,
@@ -481,10 +524,6 @@ if __name__=='__main__':
     agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 
     # Train
-    epoch        = 100
-    current_step = 0
-    max_steps    = epoch * 250000
-
     env           = Environment(gt_box=gt_box)
     current_state = env.reset()
 
@@ -497,15 +536,18 @@ if __name__=='__main__':
             reward = compute_reward(new_state, collision_info, max_dist=max_dist, thresh_dim=thresh_dim)
             done   = is_done(reward)
         except:
-            reward = -100
+            reward = -100.0
             done   = 1
 
-        print "\nAction     :", action, name, "\nReward     :", reward, "\nDone       :", done
+        print "Action     :", action, name, \
+            "\nReward     :", reward, \
+            "\nDone       :", done
         agent.observe(current_state, action, reward, done)
         agent.train()
 
         if done:
-            print "Detection Failed or too Negative Reward...Restart the Game"
+            print "[WARN] Detection Failed or Small Reward...Restarting the Game"
             new_state = restart_game()
 
         current_state = new_state
+        print "--------------------\n\n"

@@ -54,7 +54,7 @@ class Environment:
         state.WIDTH  = output[2]
         state.HEIGHT = output[3]
 
-        print "----State Values----"
+        print "\n-----Parameters-----"
         print "Velocity X:", state.VEL_X
         print "Velocity Y:", state.VEL_Y
         print "Velocity Z:", state.VEL_Z
@@ -71,6 +71,7 @@ class Environment:
 
         offset = (car_pos.x_val, car_pos.y_val, self._connector.INIT_Z)
         self._connector.move_to_position(offset)
+        # self._connector.move_to_position(offset, yaw_mode=YawMode(is_rate= False, yaw_or_rate=0.0))
         # time.sleep(3)
 
         # offset = (car_ort.x_val, car_ort.y_val, car_ort.z_val)
