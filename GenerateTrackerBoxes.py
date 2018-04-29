@@ -1,6 +1,5 @@
 import os
 import sys
-import cv2
 import tarfile
 import zipfile
 import numpy as np
@@ -34,7 +33,7 @@ class Detector:
 
 
     fig              = None
-    min_score_thresh = 0.25
+    min_score_thresh = 0.1
 
     def __init__(self):
         if not os.path.isfile(self.PATH_TO_CKPT):
@@ -52,6 +51,10 @@ class Detector:
         label_map  = label_map_util.load_labelmap(self.PATH_TO_LABELS)
         categories = label_map_util.convert_label_map_to_categories( label_map, max_num_classes=self.NUM_CLASSES, use_display_name=True)
         self.category_index = label_map_util.create_category_index(categories)
+
+    def load_image_into_numpy_array(self,image):
+        (im_width, im_height) = image.size
+        return np.array(image.getdata()).reshape((im_height, im_width, 3)).astype(np.uint8)
 
     def run_inference_for_single_image(self, image):
         with self.detection_graph.as_default():
@@ -98,34 +101,6 @@ class Detector:
                     output_dict['detection_masks'] = output_dict['detection_masks'][0]
         return output_dict
 
-    def test_detection(self):
-        # If you want to test the code with your images, just add path to the images to the TEST_IMAGE_PATHS.
-        PATH_TO_TEST_IMAGES_DIR = 'data/detector_val'
-        TEST_IMAGE_PATHS        = [ os.path.join(PATH_TO_TEST_IMAGES_DIR, '000{}.png'.format(i)) for i in range(0, 3) ]
-
-        for image_path in TEST_IMAGE_PATHS:
-            # the array based representation of the image will be used later in order to prepare the
-            # result image with boxes and labels on it.
-            image_np = np.asarray(Image.open(image_path).convert('RGB'), dtype=np.uint8).copy()
-
-            # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
-            image_np_expanded = np.expand_dims(image_np, axis=0)
-
-            # Actual detection.
-            output_dict = self.run_inference_for_single_image(image_np)
-
-            # Visualization of the results of a detection.
-            vis_util.visualize_boxes_and_labels_on_image_array( image_np,
-                                                                output_dict['detection_boxes'],
-                                                                output_dict['detection_classes'],
-                                                                output_dict['detection_scores'],
-                                                                self.category_index,
-                                                                instance_masks=output_dict.get('detection_masks'),
-                                                                use_normalized_coordinates=True,
-                                                                line_thickness=2)
-            import matplotlib.image as mpimg
-            mpimg.imsave(image_path.split('/')[-1], image_np)
-
     def detect(self, image_np, gt_box=None):
         image = image_np.copy()
         # image_np_expanded = np.expand_dims(image_np, axis=0)
@@ -149,19 +124,25 @@ class Detector:
                                                             skip_scores=False,
                                                             skip_labels=True,
                                                             line_thickness=4)
-        # cv2.imshow('Simulation', image)
-        # cv2.waitKey(10)
+
+        # To Ensure that figure does not appear again on foreground and stays in background
+        if not self.fig:
+            plt.ion()
+            self.fig = plt.figure()
+            self.plot = plt.subplot(1,1,1)
+            plt.imshow(image)
+            self.fig.show()
+        else:
+            plt.imshow(image)
+            self.plot.relim()
+            self.fig.canvas.flush_events()
 
         bboxes  = output_dict['detection_boxes']
         classes = output_dict['detection_classes']
         scores  = output_dict['detection_scores']
 
-        bboxes   = [bbox for bbox, _ in sorted(zip(bboxes, scores), key=lambda pair: pair[1], reverse=True)]
-        classes  = [clss for clss, _ in sorted(zip(classes, scores), key=lambda pair: pair[1], reverse=True)]
-        scores   = sorted(scores, key=lambda x: x, reverse=True)
-
         im_height, im_width = image_np.shape[0:2]
-        for i in range(len(bboxes)):
+        for i in range(bboxes.shape[0]):
           if scores is None or scores[i] > self.min_score_thresh:
             if classes[i] in self.category_index.keys():
                 class_name = self.category_index[classes[i]]['name']
@@ -173,15 +154,27 @@ class Detector:
                     top    = ymin * im_height
                     bottom = ymax * im_height
 
-                    POS_X  = (left + right - im_width)/2.0
-                    POS_Y  = (im_height - top - bottom)/2.0
-                    WIDTH  = right - left
-                    HEIGHT = bottom - top
 
-                    return (POS_X, POS_Y, WIDTH, HEIGHT)
+                    return (left, right, top, bottom)
 
         return None
 
-# if __name__=='__main__':
-#     model = Detector()
-#     model.test_detection()
+if __name__=="__main__":
+    detector = Detector()
+    for _, dirs, _ in os.walk("data"):
+        for dir in dirs:
+            if not dir[:3]=="seq":
+                continue
+            for _, _, files in os.walk("data/"+dir):
+                for f in files:
+                    if not f.endswith(".png"):
+                        continue
+                    file = "data/"+dir+"/"+f
+                    print file
+                    img_rgb = np.asarray(Image.open(file).convert('RGB'), dtype=np.uint8)
+                    result = detector.detect(img_rgb)
+                    if result is not None:
+                        (left, right, top, bottom) = result
+                        annot = file.split('.')[0] + ".txt"
+                        with open(annot, 'wb') as f:
+                            f.write((str(left) + " " + str(right) + " " + str(top) + " " + str(bottom)))

@@ -1,7 +1,4 @@
-# from Environment import Environment
-# from EnvironmentSeq import EnvironmentSeq
-from EnvironmentSeq import EnvironmentSeq
-from EnvironmentSeqRT import EnvironmentSeqRT
+from EnvironmentSim import EnvironmentSim
 
 import os
 import random
@@ -137,21 +134,21 @@ class DeepQAgent(object):
 
     STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
     GAMMA                  = 0.99  # Discount factor
-    EXPLORATION_STEPS      = 20000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+    EXPLORATION_STEPS      = 10000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
     INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
     FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
-    INITIAL_REPLAY_SIZE    = 20000  # Number of steps to populate the replay memory before training starts
-    MEMORY_SIZE            = 40000  # Number of replay memory the agent uses for training
+    INITIAL_REPLAY_SIZE    = 10000  # Number of steps to populate the replay memory before training starts
+    MEMORY_SIZE            = 400000  # Number of replay memory the agent uses for training
     BATCH_SIZE             = 64  # Mini batch size
-    TARGET_UPDATE_INTERVAL = 20000  # The frequency with which the target network is updated
-    TRAIN_AFTER            = 4000 # Number of Steps after which training starts
+    TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
+    TRAIN_AFTER            = 500 # Number of Steps after which training starts
     TRAIN_INTERVAL         = 4  # The agent selects 4 actions between successive updates
     LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
     MOMENTUM               = 0.95  # Momentum used by RMSProp
     MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
-    SAVE_INTERVAL          = 20000  # The frequency with which the network is saved
+    SAVE_INTERVAL          = 10000  # The frequency with which the network is saved
     LOAD_NETWORK           = False
-    SAVE_NETWORK_PATH      = 'models'
+    SAVE_NETWORK_PATH      = 'models_sim'
     SAVE_SUMMARY_PATH      = 'logs'
 
     def __init__(self, input_shape, nb_actions):
@@ -401,126 +398,28 @@ class DeepQAgent(object):
         return None
 
 
+def interpret_action(action):
+    scaling_factor = 0.25
+    if action == 0:
+        quad_offset = (0, 0, 0)
+    elif action == 1:
+        quad_offset = (scaling_factor, 0, 0)
+    elif action == 2:
+        quad_offset = (0, scaling_factor, 0)
+    elif action == 3:
+        quad_offset = (-scaling_factor, 0, 0)
+    elif action == 4:
+        quad_offset = (0, -scaling_factor, 0)
 
+    return quad_offset
 
-def get_iou(bb1, bb2):
-    """
-    Calculate the Intersection over Union (IoU) of two bounding boxes.
-        The (x1, y1) position is at the top left corner,
-        The (x2, y2) position is at the bottom right corner
-        Cartesian Co-ordinate System with origin at center of frame right and top are positive axis
-    """
-
-    assert bb1['x1'] < bb1['x2']
-    assert bb1['y1'] > bb1['y2']
-    assert bb2['x1'] < bb2['x2']
-    assert bb2['y1'] > bb2['y2']
-
-    # determine the coordinates of the intersection rectangle
-    x_left   = max(bb1['x1'], bb2['x1'])
-    y_top    = min(bb1['y1'], bb2['y1'])
-    x_right  = min(bb1['x2'], bb2['x2'])
-    y_bottom = max(bb1['y2'], bb2['y2'])
-
-    if x_right < x_left or y_bottom > y_top:
-        return 0.0
-
-    # The intersection of two axis-aligned bounding boxes is always an
-    # axis-aligned bounding box
-    intersection_area = (x_right - x_left) * (y_bottom - y_top)
-
-    # compute the area of both AABBs
-    bb1_area = (bb1['x2'] - bb1['x1']) * (bb1['y2'] - bb1['y1'])
-    bb2_area = (bb2['x2'] - bb2['x1']) * (bb2['y2'] - bb2['y1'])
-
-    # compute the intersection over union by taking the intersection
-    # area and dividing it by the sum of prediction + ground-truth
-    # areas - the interesection area
-    iou = intersection_area / float(bb1_area + bb2_area - intersection_area)
-    assert iou >= 0.0
-    assert iou <= 1.0
-    return iou
-
-# def interpret_action(action):
-#     scaling_factor = 0.25
-#     if action == 0:
-#         quad_offset = (0, 0, 0)
-#         name        = 'O'
-#     elif action == 1:
-#         quad_offset = (scaling_factor, 0, 0)
-#         name        = '+X'
-#     elif action == 2:
-#         quad_offset = (0, scaling_factor, 0)
-#         name        = '+Y'
-#     elif action == 3:
-#         quad_offset = (0, 0, scaling_factor)
-#         name        = '+Z'
-#     elif action == 4:
-#         quad_offset = (-scaling_factor, 0, 0)
-#         name        = '-X'
-#     elif action == 5:
-#         quad_offset = (0, -scaling_factor, 0)
-#         name        = '-Y'
-#     elif action == 6:
-#         quad_offset = (0, 0, -scaling_factor)
-#         name        = '-Z'
+# def interpret_action_seq(action, step_sizes):
+#     action_size = len(step_sizes)
+#     quad_offset = (step_sizes[action%action_size], step_sizes[action/action_size])
+#     name        = str(quad_offset) + " m"
 #
 #     return quad_offset, name
 
-def interpret_action_seq(action):
-    step_sizes  = [-40, -20, 0, 20, 40]
-    action_size = len(step_sizes)
-    quad_offset = (step_sizes[action%action_size], step_sizes[action/action_size])
-    name        = str(quad_offset) + " pixels"
-
-    return quad_offset, name
-
-
-# def compute_reward(state, collision_info, max_dist=735.0, thresh_dim=(160,320)):
-#     ''' Compute reward function which is scaled sumation of euclidean distance of center of bbox from center
-#     of frame and IoU of bbox and a imaginary box centered at frame center with dimensions THRESH_H x THRESH_W
-#     '''
-#
-#     THRESH_W, THRESH_H = thresh_dim
-#     SCALE_DIST = 1.
-#     SCALE_IOU  = 10.
-#
-#     if collision_info.has_collided:
-#         reward = -2.0
-#     else:
-#         x = state[3]
-#         y = state[4]
-#
-#         w = state[5]
-#         h = state[6]
-#
-#         dist = np.linalg.norm([x, y])/max_dist
-#         bb1 = {
-#                 'x1': x - w/2,
-#                 'x2': x + w/2,
-#                 'y1': y + h/2,
-#                 'y2': y - h/2
-#         }
-#         bb2 = {
-#                 'x1': 0 - THRESH_W/2,
-#                 'x2': 0 + THRESH_W/2,
-#                 'y1': 0 + THRESH_H/2,
-#                 'y2': 0 - THRESH_H/2
-#         }
-#         iou  = get_iou(bb1, bb2)
-#         reward = (1-dist)*SCALE_DIST + iou*SCALE_IOU
-#         print "Distance   :", dist, \
-#             "\nIoU        :", iou, \
-#             "\nDist Reward:", (1-dist)*SCALE_DIST, \
-#             "\nIoU Reward :", iou*SCALE_IOU
-#
-#     return reward
-
-def is_done(reward):
-    done = 0
-    if  reward <= -20.0:
-        done = 1
-    return done
 
 def restart_game():
     return env.reset()
@@ -530,46 +429,25 @@ if __name__=='__main__':
     TEST             = False # False
     # Make RL agent
     input_dims       = 2 # 8
-    num_actions      = 25 # 7
+    num_actions      = 5 # 7
     num_buff_frames  = 4
-    #max_dist         = 735 # sqrt( sqr(960) + sqr(540))
     im_width         = 1280
     im_height        = 720
-    #thresh_dim       = (120, 145)
-    step_sizes       = [-40, -20, 0, 20, 40]
-    max_guided_eps   = 2000
+    max_guided_eps   = 1000
 
-
-    # gt_box = np.array([ (im_height/2.0 - thresh_dim[1]/2.0) / im_height,
-    #                     (im_width/2.0 - thresh_dim[0]/2.0) / im_width,
-    #                     (im_height/2.0 + thresh_dim[1]/2.0) / im_height,
-    #                     (im_width/2.0 + thresh_dim[0]/2.0) / im_width])
 
     agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 
     if not TEST:
         # Train
-        # env           = Environment(gt_box=gt_box)
-        env           = EnvironmentSeq(image_shape=(im_height, im_width), step_sizes=step_sizes, max_guided_eps=max_guided_eps)
+        env           = EnvironmentSim(image_shape=(im_height, im_width), max_guided_eps=max_guided_eps)
         current_state = env.reset()
 
         while True:
             action            = agent.act(current_state)
-            # quad_offset, name = interpret_action(action)
-            quad_offset, name = interpret_action_seq(action)
-
+            # quad_offset, name = interpret_action_seq(action, step_sizes)
+            quad_offset       = interpret_action(action)
             new_state, reward, done = env.step(quad_offset)
-            # print "Action     :", action, name
-            # print "Reward     :", reward
-            # print "Done       :", done
-            # try:
-            #     # new_state, collision_info = env.step(quad_offset, duration=2)
-            #     # reward = compute_reward(new_state, collision_info, max_dist=max_dist, thresh_dim=thresh_dim)
-            #     # done   = is_done(reward)
-            #     new_state, reward, done = env.step(quad_offset)
-            # except:
-            #     reward = -100.0
-            #     done   = 1
             agent.observe(current_state, action, reward, done)
             agent.train()
 
@@ -581,13 +459,13 @@ if __name__=='__main__':
             print "--------------------\n"
     else:
         # Test
-        env = EnvironmentSeqRT(image_shape=(im_height, im_width), step_sizes=step_sizes)
+        env           = EnvironmentSim(image_shape=(im_height, im_width))
         current_state = env.reset()
 
         while True:
             action = agent.test(current_state)
             quad_offset = None
             if action is not None:
-                quad_offset, _ = interpret_action_seq(action)
-            new_state = env.step(quad_offset)
+                quad_offset, _ = interpret_action_seq(action, step_sizes)
+            new_state, _, _ = env.step(quad_offset)
             current_state = new_state

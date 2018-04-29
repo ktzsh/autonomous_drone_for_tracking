@@ -1,7 +1,6 @@
 # from Environment import Environment
 # from EnvironmentSeq import EnvironmentSeq
-from EnvironmentSeq import EnvironmentSeq
-from EnvironmentSeqRT import EnvironmentSeqRT
+from EnvironmentRealTimeImg import EnvironmentRealTime
 
 import os
 import random
@@ -137,21 +136,21 @@ class DeepQAgent(object):
 
     STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
     GAMMA                  = 0.99  # Discount factor
-    EXPLORATION_STEPS      = 20000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+    EXPLORATION_STEPS      = 15000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
     INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
     FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
-    INITIAL_REPLAY_SIZE    = 20000  # Number of steps to populate the replay memory before training starts
-    MEMORY_SIZE            = 40000  # Number of replay memory the agent uses for training
+    INITIAL_REPLAY_SIZE    = 15000  # Number of steps to populate the replay memory before training starts
+    MEMORY_SIZE            = 45000  # Number of replay memory the agent uses for training
     BATCH_SIZE             = 64  # Mini batch size
-    TARGET_UPDATE_INTERVAL = 20000  # The frequency with which the target network is updated
+    TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
     TRAIN_AFTER            = 4000 # Number of Steps after which training starts
     TRAIN_INTERVAL         = 4  # The agent selects 4 actions between successive updates
     LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
     MOMENTUM               = 0.95  # Momentum used by RMSProp
     MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
-    SAVE_INTERVAL          = 20000  # The frequency with which the network is saved
+    SAVE_INTERVAL          = 10000  # The frequency with which the network is saved
     LOAD_NETWORK           = False
-    SAVE_NETWORK_PATH      = 'models'
+    SAVE_NETWORK_PATH      = 'models_realtime'
     SAVE_SUMMARY_PATH      = 'logs'
 
     def __init__(self, input_shape, nb_actions):
@@ -537,39 +536,20 @@ if __name__=='__main__':
     im_height        = 720
     #thresh_dim       = (120, 145)
     step_sizes       = [-40, -20, 0, 20, 40]
-    max_guided_eps   = 2000
+    max_guided_eps   = 1000
 
-
-    # gt_box = np.array([ (im_height/2.0 - thresh_dim[1]/2.0) / im_height,
-    #                     (im_width/2.0 - thresh_dim[0]/2.0) / im_width,
-    #                     (im_height/2.0 + thresh_dim[1]/2.0) / im_height,
-    #                     (im_width/2.0 + thresh_dim[0]/2.0) / im_width])
 
     agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 
     if not TEST:
         # Train
-        # env           = Environment(gt_box=gt_box)
-        env           = EnvironmentSeq(image_shape=(im_height, im_width), step_sizes=step_sizes, max_guided_eps=max_guided_eps)
+        env           = EnvironmentRealTime(image_shape=(im_height, im_width), step_sizes=step_sizes, max_guided_eps=max_guided_eps)
         current_state = env.reset()
 
         while True:
             action            = agent.act(current_state)
-            # quad_offset, name = interpret_action(action)
             quad_offset, name = interpret_action_seq(action)
-
             new_state, reward, done = env.step(quad_offset)
-            # print "Action     :", action, name
-            # print "Reward     :", reward
-            # print "Done       :", done
-            # try:
-            #     # new_state, collision_info = env.step(quad_offset, duration=2)
-            #     # reward = compute_reward(new_state, collision_info, max_dist=max_dist, thresh_dim=thresh_dim)
-            #     # done   = is_done(reward)
-            #     new_state, reward, done = env.step(quad_offset)
-            # except:
-            #     reward = -100.0
-            #     done   = 1
             agent.observe(current_state, action, reward, done)
             agent.train()
 
@@ -581,7 +561,7 @@ if __name__=='__main__':
             print "--------------------\n"
     else:
         # Test
-        env = EnvironmentSeqRT(image_shape=(im_height, im_width), step_sizes=step_sizes)
+        env = EnvironmentRealTime(image_shape=(im_height, im_width), step_sizes=step_sizes)
         current_state = env.reset()
 
         while True:
@@ -589,5 +569,5 @@ if __name__=='__main__':
             quad_offset = None
             if action is not None:
                 quad_offset, _ = interpret_action_seq(action)
-            new_state = env.step(quad_offset)
+            new_state, _, _ = env.step(quad_offset)
             current_state = new_state

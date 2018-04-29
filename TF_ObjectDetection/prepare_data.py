@@ -1,3 +1,4 @@
+import os
 import imgaug as ia
 from imgaug import augmenters as iaa
 import numpy as np
@@ -70,7 +71,7 @@ def main(_):
         )),
         sometimes(iaa.Affine(
             translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)}, # translate by -50 to +50 percent (per axis)
-            rotate=(-45, 45), # rotate by -90 to +90 degrees
+            rotate=(-20, 20), # rotate by -90 to +90 degrees
             order=[0, 1], # use nearest neighbour or bilinear interpolation (fast)
             cval=(0, 255), # if mode is constant, use a cval between 0 and 255
             mode=ia.ALL # use any of scikit-image's warping modes (see 2nd image from the top for examples)
@@ -79,12 +80,16 @@ def main(_):
     random_order=True)
 
     ann              = None
-    num_orig_samples = 25
-    num_batches      = 100
+    num_batches      = 80
     images, bboxs    = [], []
 
-    for i in range(num_orig_samples):
-        path = 'data/orig_data/' + FLAGS.flag + '/' + str(i).zfill(4) + '.xml'
+    dir_path = '/home/kshitiz/workspace/autonomous_drone_for_tracking/data/detector_' + FLAGS.flag + '/'
+    xml_files = [f for f in os.listdir(dir_path) if f.endswith('.xml')]
+
+    num_orig_samples = len(xml_files)
+
+    for i,xml_file in enumerate(xml_files):
+        path = dir_path + xml_file
         tree = ET.parse(path)
         root = tree.getroot()
 
@@ -97,19 +102,19 @@ def main(_):
         ymax = int(bndbox.find('ymax').text)
 
 
-        image = np.asarray(Image.open(('data/orig_data/' + FLAGS.flag + '/' + \
-                            str(i).zfill(4) + '.png')), dtype='uint8')
+        image = np.asarray(Image.open((path.split('.')[0] + '.png')), dtype='uint8')
         bbox  = ia.BoundingBoxesOnImage([ia.BoundingBox(x1=xmin, y1=ymin, x2=xmax, y2=ymax)], shape=image.shape)
 
         images.append(image)
         bboxs.append(bbox)
-        #image_copy = image.copy()
-        #vis_util.draw_bounding_boxes_on_image_array( image_copy,
-        #                                                 np.array([[float(ymin)/image.shape[0], float(xmin)/image.shape[1], float(ymax)/image.shape[0], float(xmax)/image.shape[1] ]]),
-        #                                                 color='yellow',
-        #                                                thickness=4)
-       	#imgplot = plt.imshow(image_copy)
-        #plt.show()
+
+        # image_copy = image.copy()
+        # vis_util.draw_bounding_boxes_on_image_array( image_copy,
+        #                                              np.array([[float(ymin)/image.shape[0], float(xmin)/image.shape[1], float(ymax)/image.shape[0], float(xmax)/image.shape[1] ]]),
+        #                                              color='yellow',
+        #                                              thickness=4)
+       	# imgplot = plt.imshow(image_copy)
+        # plt.show()
 
 
     for i in range(num_batches):
@@ -126,17 +131,19 @@ def main(_):
                         FLAGS.flag + '/' + str(i*num_orig_samples+j).zfill(6) + '.png'
             result.save(out_path)
 
-            #image = image_np.copy()
-            #vis_util.draw_bounding_boxes_on_image_array( image,
+            # image = image_np.copy()
+            # vis_util.draw_bounding_boxes_on_image_array( image,
             #                                             np.array([[ float(bbox.y1)/image.shape[0], float(bbox.x1)/image.shape[1], float(bbox.y2)/image.shape[0], float(bbox.x2)/image.shape[1]]]),
             #                                             color='yellow',
             #                                             thickness=4)
-            #imgplot = plt.imshow(image)
-            #plt.show()
+            # imgplot = plt.imshow(image)
+            # plt.show()
 
 
             tf_example = create_tf_example(out_path, bbox, image.shape)
             writer.write(tf_example.SerializeToString())
+
+            os.remove(out_path)
 
         if i%10==0 and i!=0:
             print "Number of batches processed", i
