@@ -19,9 +19,6 @@ class MultiRotorConnector:
         self.client = MultirotorClient()
         self.client.confirmConnection()
         self.client.enableApiControl(True)
-        # self.client.armDisarm(True)
-        # self.client.takeoff()
-        # self.client.moveToPosition(self.INIT_X, self.INIT_Y, self.INIT_Z, 10)
 
     def reset(self):
         self.client.reset()

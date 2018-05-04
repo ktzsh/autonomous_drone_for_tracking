@@ -2,6 +2,7 @@ from EnvironmentSim import EnvironmentSim
 
 import os
 import random
+import pickle
 import numpy as np
 import tensorflow as tf
 from collections import deque
@@ -99,6 +100,13 @@ class ReplayMemory(object):
             indexes = np.arange(index - history_length + 1, index + 1)
             return self._states.take(indexes, mode='wrap', axis=0)
 
+    def save(self, path):
+        with open('pickle.txt', 'wb') as f:
+            f.write(path)
+        print "Saving Replay Memory to", path
+        with open(path, 'wb') as f:
+            pickle.dump(self, f, pickle.HIGHEST_PROTOCOL)
+
 
 class History(object):
     """
@@ -134,11 +142,11 @@ class DeepQAgent(object):
 
     STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
     GAMMA                  = 0.99  # Discount factor
-    EXPLORATION_STEPS      = 10000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+    EXPLORATION_STEPS      = 20000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
     INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
     FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
     INITIAL_REPLAY_SIZE    = 10000  # Number of steps to populate the replay memory before training starts
-    MEMORY_SIZE            = 400000  # Number of replay memory the agent uses for training
+    MEMORY_SIZE            = 1000000  # Number of replay memory the agent uses for training
     BATCH_SIZE             = 64  # Mini batch size
     TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
     TRAIN_AFTER            = 500 # Number of Steps after which training starts
@@ -146,10 +154,10 @@ class DeepQAgent(object):
     LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
     MOMENTUM               = 0.95  # Momentum used by RMSProp
     MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
-    SAVE_INTERVAL          = 10000  # The frequency with which the network is saved
-    LOAD_NETWORK           = False
-    SAVE_NETWORK_PATH      = 'models_sim'
-    SAVE_SUMMARY_PATH      = 'logs'
+    SAVE_INTERVAL          = 5000  # The frequency with which the network is saved
+    LOAD_NETWORK           = True
+    SAVE_NETWORK_PATH      = 'models_sim/still'
+    SAVE_SUMMARY_PATH      = 'logs/still'
 
     def __init__(self, input_shape, nb_actions):
         self.t            = 0
@@ -166,8 +174,29 @@ class DeepQAgent(object):
         self.nb_actions   = nb_actions
 
         self._history           = History(input_shape)
-        self._memory            = ReplayMemory(self.MEMORY_SIZE, input_shape[1:], self.STATE_LENGTH)
         self._num_actions_taken = 0
+
+        self.pickle_path        = None
+
+        self._memory            = None
+        if os.path.exists('pickle.txt'):
+            path = None
+            with open('pickle.txt', 'rb') as f:
+                path   = f.readline().rstrip('\n')
+                params = path.split('.')[0].split('_')
+
+                self.episode            = int(params[1])
+                self.t                  = int(params[2])
+                self._num_actions_taken = int(params[3])
+                self.epsilon            = float(params[4])
+            with open(path, 'rb') as f:
+                print "Restoring Replay Memory from", path
+                self._memory     = pickle.load(f)
+                self.pickle_path = path
+        else:
+            self._memory = ReplayMemory(self.MEMORY_SIZE, input_shape[1:], self.STATE_LENGTH)
+
+
 
         # Action Value model (used by agent to interact with the environment)
         self.s, self.q_values, q_network = self.build_network(self.input_shape)
@@ -201,6 +230,7 @@ class DeepQAgent(object):
 
         # Initialize target network
         self.sess.run(self.update_target_network)
+
 
     def build_network(self, input_shape):
         model = Sequential()
@@ -309,6 +339,15 @@ class DeepQAgent(object):
 
         # Append to long term memory
         self._memory.append(old_state, action, reward, done)
+        if done:
+            old_pickle_path = self.pickle_path
+            self.pickle_path = 'memory_' + str(self.episode) + '_' + str(self.t) + '_' \
+                            + str(self._num_actions_taken) + '_' + str(self.epsilon) + \
+                            '.pickle'
+            self._memory.save(self.pickle_path)
+
+            if old_pickle_path is not None:
+                os.remove(old_pickle_path)
 
     def train(self):
         """ This allows the agent to train itself to better understand the environment dynamics.
@@ -321,29 +360,31 @@ class DeepQAgent(object):
         The Target Network is a frozen copy of the Action Value Network updated as regular intervals.
         """
         agent_step = self._num_actions_taken
-        if agent_step >= self.TRAIN_AFTER:
-            if (agent_step % self.TRAIN_INTERVAL) == 0:
-                # Clip all positive rewards at 1 and all negative rewards at -1, leaving 0 rewards unchanged
-                # reward = np.clip(reward, -1, 1)
-                print "Episode    :", self.episode, \
-                    "\nTimestep   :", self.t, \
-                    "\nAgent Step :", agent_step
+        # if agent_step >= self.TRAIN_AFTER:
+        if (agent_step % self.TRAIN_INTERVAL) == 0:
+            # Clip all positive rewards at 1 and all negative rewards at -1, leaving 0 rewards unchanged
+            # reward = np.clip(reward, -1, 1)
+            print "Episode    :", self.episode, \
+                "\nTimestep   :", self.t, \
+                "\nAgent Step :", agent_step
 
-                if self.t >= self.INITIAL_REPLAY_SIZE:
-                    # Train network
-                    if self.t % self.TRAIN_INTERVAL == 0:
-                        self.train_network()
+            if self.t >= self.INITIAL_REPLAY_SIZE:
+                # Train network
+                self.train_network()
 
-                    # Update target network
-                    if self.t % self.TARGET_UPDATE_INTERVAL == 0:
-                        self.sess.run(self.update_target_network)
+                # Update target network
+                if self.t % self.TARGET_UPDATE_INTERVAL == 0:
+                    self.sess.run(self.update_target_network)
 
-                    # Save network
-                    if self.t % self.SAVE_INTERVAL == 0:
-                        save_path = self.saver.save(self.sess, self.SAVE_NETWORK_PATH + '/chkpnt', global_step=self.t)
-                        print "Successfully saved:", save_path
+                # Save network
+                if self.t % self.SAVE_INTERVAL == 0:
+                    self.last_epsilon = self.epsilon
+                    self.last_t       = self.t
 
-                self.t += 1
+                    save_path = self.saver.save(self.sess, self.SAVE_NETWORK_PATH + '/chkpnt', global_step=self.t)
+                    print "Successfully saved:", save_path
+
+            self.t += 1
 
     def train_network(self):
         ''' Extension to train() call - Batch generation and graph computations
@@ -399,7 +440,8 @@ class DeepQAgent(object):
 
 
 def interpret_action(action):
-    scaling_factor = 0.25
+    scaling_factor   = 0.25
+    scaling_factor_z = 0.125
     if action == 0:
         quad_offset = (0, 0, 0)
     elif action == 1:
@@ -407,9 +449,13 @@ def interpret_action(action):
     elif action == 2:
         quad_offset = (0, scaling_factor, 0)
     elif action == 3:
-        quad_offset = (-scaling_factor, 0, 0)
+        quad_offset = (0, 0 , scaling_factor_z)
     elif action == 4:
+        quad_offset = (-scaling_factor, 0, 0)
+    elif action == 5:
         quad_offset = (0, -scaling_factor, 0)
+    elif action == 6:
+        quad_offset = (0, 0, -scaling_factor_z)
 
     return quad_offset
 
@@ -428,13 +474,12 @@ def restart_game():
 if __name__=='__main__':
     TEST             = False # False
     # Make RL agent
-    input_dims       = 2 # 8
-    num_actions      = 5 # 7
+    input_dims       = 3 # 8
+    num_actions      = 7 # 7
     num_buff_frames  = 4
     im_width         = 1280
     im_height        = 720
     max_guided_eps   = 1000
-
 
     agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 
