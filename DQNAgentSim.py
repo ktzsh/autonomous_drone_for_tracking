@@ -142,7 +142,7 @@ class DeepQAgent(object):
 
     STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
     GAMMA                  = 0.99  # Discount factor
-    EXPLORATION_STEPS      = 20000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+    EXPLORATION_STEPS      = 10000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
     INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
     FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
     INITIAL_REPLAY_SIZE    = 10000  # Number of steps to populate the replay memory before training starts
@@ -156,8 +156,8 @@ class DeepQAgent(object):
     MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
     SAVE_INTERVAL          = 5000  # The frequency with which the network is saved
     LOAD_NETWORK           = True
-    SAVE_NETWORK_PATH      = 'models_sim/still'
-    SAVE_SUMMARY_PATH      = 'logs/still'
+    SAVE_NETWORK_PATH      = 'models_sim_new/still'
+    SAVE_SUMMARY_PATH      = 'logs_new/still'
 
     def __init__(self, input_shape, nb_actions):
         self.t            = 0
@@ -378,9 +378,6 @@ class DeepQAgent(object):
 
                 # Save network
                 if self.t % self.SAVE_INTERVAL == 0:
-                    self.last_epsilon = self.epsilon
-                    self.last_t       = self.t
-
                     save_path = self.saver.save(self.sess, self.SAVE_NETWORK_PATH + '/chkpnt', global_step=self.t)
                     print "Successfully saved:", save_path
 
@@ -440,8 +437,7 @@ class DeepQAgent(object):
 
 
 def interpret_action(action):
-    scaling_factor   = 0.25
-    scaling_factor_z = 0.125
+    scaling_factor   = 0.125
     if action == 0:
         quad_offset = (0, 0, 0)
     elif action == 1:
@@ -449,13 +445,13 @@ def interpret_action(action):
     elif action == 2:
         quad_offset = (0, scaling_factor, 0)
     elif action == 3:
-        quad_offset = (0, 0 , scaling_factor_z)
+        quad_offset = (0, 0 , scaling_factor)
     elif action == 4:
         quad_offset = (-scaling_factor, 0, 0)
     elif action == 5:
         quad_offset = (0, -scaling_factor, 0)
     elif action == 6:
-        quad_offset = (0, 0, -scaling_factor_z)
+        quad_offset = (0, 0, -scaling_factor)
 
     return quad_offset
 
@@ -479,13 +475,12 @@ if __name__=='__main__':
     num_buff_frames  = 4
     im_width         = 1280
     im_height        = 720
-    max_guided_eps   = 1000
 
     agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
 
     if not TEST:
         # Train
-        env           = EnvironmentSim(image_shape=(im_height, im_width), max_guided_eps=max_guided_eps)
+        env           = EnvironmentSim(image_shape=(im_height, im_width))
         current_state = env.reset()
 
         while True:

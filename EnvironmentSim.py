@@ -2,6 +2,7 @@ import os
 import sys
 import cv2
 import time
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -23,14 +24,14 @@ class State():
     pass
 
 class EnvironmentSim:
-    def __init__(self, image_shape=(720, 1280), max_dist=100.0, max_guided_eps=1000):
-        self.current_episode = 0
-        self.max_guided_eps  = max_guided_eps
+    def __init__(self, image_shape=(720, 1280)):
+        self.current_episode  = 0
+        self.current_timestep = 0
 
         self.im_width  = image_shape[1]
         self.im_height = image_shape[0]
 
-        self.max_dist   = max_dist
+        self.max_dist   = 50.0
         self.max_dist_z = 10.0
 
         self.current_frame    = None
@@ -48,7 +49,8 @@ class EnvironmentSim:
         return out
 
     def reset(self):
-        self.current_episode += 1
+        self.current_episode  += 1
+        self.current_timestep += 1
 
         car_pos, car_ort = self._car_connector.reset()
         self._uav_connector.reset()
@@ -94,17 +96,29 @@ class EnvironmentSim:
 
         dist_x = car_pos.x_val - uav_pos.x_val
         dist_y = car_pos.y_val - uav_pos.y_val
-        dist_z = uav_pos.z_val - self._uav_connector.INIT_Z
+        dist_xy = np.linalg.norm([dist_x, dist_y])
+        reward_xy = dist_xy/self.max_dist
+        if reward_xy > 1.0:
+            reward_xy = 1 - math.exp(reward_xy):
+        else:
+            reward_xy = 1 - reward_xy
 
-        dist_xy = np.linalg.norm([dist_x, dist_y])/self.max_dist
-        reward_xy = (1-2.0*dist_xy)
-        reward_z  = (1-2.0*(abs(dist_z)/self.max_dist_z))
+
+        dist_z = abs(uav_pos.z_val - self._uav_connector.INIT_Z)
+        reward_z  = dist_z/self.max_dist_z
+        if reward_z > 1.0:
+            reward_z = -1 * math.exp(reward_z):
+        else:
+            reward_z = -1 * reward_z
+
         reward    = (reward_xy + reward_z)/2.0
         print "Distance XY:", dist_xy, \
-            "\nReward XY  :", reward_xy
-        print "Distance Z :", dist_z, \
+            "\nDistance Z :", dist_z
+        print "Reward XY  :", reward_xy, \
             "\nReward Z   :", reward_z
-        print "Action RL  :", action, "+m/s"
+
+        if self.current_timestep % 4 == 0:
+            reward += 0.05
 
         # cv2.imshow('Simulation', frame)
         # cv2.waitKey(5)
@@ -112,7 +126,8 @@ class EnvironmentSim:
         # NEXT frame
         _state = State()
 
-        if reward_xy<-1 or reward_z<-1.0 or car_pos.z_val<=-2.0:
+        if dist_z>(abs(self._uav_connector.INIT_Z) - 3) or reward<-10 or car_pos.z_val<=-2.0:
+            reward = -10
             done   = 1
         else:
             _state.DELTA_X = car_pos.x_val - uav_pos.x_val
@@ -121,6 +136,7 @@ class EnvironmentSim:
             self.current_state = _state
 
         print "Reward     :", reward
+        print "Action RL  :", action, "+m/s"
         print "Done       :", done
 
         return self.state_to_array(_state), reward, done
