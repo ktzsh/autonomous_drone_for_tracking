@@ -142,12 +142,12 @@ class DeepQAgent(object):
 
     STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
     GAMMA                  = 0.99  # Discount factor
-    EXPLORATION_STEPS      = 10000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+    EXPLORATION_STEPS      = 20000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
     INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
     FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
-    INITIAL_REPLAY_SIZE    = 10000  # Number of steps to populate the replay memory before training starts
+    INITIAL_REPLAY_SIZE    = 5000  # Number of steps to populate the replay memory before training starts
     MEMORY_SIZE            = 1000000  # Number of replay memory the agent uses for training
-    BATCH_SIZE             = 64  # Mini batch size
+    BATCH_SIZE             = 32  # Mini batch size
     TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
     TRAIN_AFTER            = 500 # Number of Steps after which training starts
     TRAIN_INTERVAL         = 4  # The agent selects 4 actions between successive updates
@@ -156,8 +156,8 @@ class DeepQAgent(object):
     MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
     SAVE_INTERVAL          = 5000  # The frequency with which the network is saved
     LOAD_NETWORK           = True
-    SAVE_NETWORK_PATH      = 'models_sim_new/still'
-    SAVE_SUMMARY_PATH      = 'logs_new/still'
+    SAVE_NETWORK_PATH      = 'models_sim/still_newer'
+    SAVE_SUMMARY_PATH      = 'logs/still_newer'
 
     def __init__(self, input_shape, nb_actions):
         self.t            = 0

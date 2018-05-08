@@ -34,6 +34,9 @@ class EnvironmentSim:
         self.max_dist   = 50.0
         self.max_dist_z = 10.0
 
+        self.MIN_ALTITUDE = -1.0
+        self.MAX_ALTITUDE = -40.0
+
         self.current_frame    = None
         self.current_output   = None
 
@@ -97,19 +100,14 @@ class EnvironmentSim:
         dist_x = car_pos.x_val - uav_pos.x_val
         dist_y = car_pos.y_val - uav_pos.y_val
         dist_xy = np.linalg.norm([dist_x, dist_y])
-        reward_xy = dist_xy/self.max_dist
-        if reward_xy > 1.0:
-            reward_xy = 1 - math.exp(reward_xy):
-        else:
-            reward_xy = 1 - reward_xy
-
+        reward_xy = (1.0 - dist_xy/self.max_dist) * 1.0
 
         dist_z = abs(uav_pos.z_val - self._uav_connector.INIT_Z)
         reward_z  = dist_z/self.max_dist_z
         if reward_z > 1.0:
-            reward_z = -1 * math.exp(reward_z):
+            reward_z = -1.0 * math.exp(reward_z)
         else:
-            reward_z = -1 * reward_z
+            reward_z = -1.0 * reward_z
 
         reward    = (reward_xy + reward_z)/2.0
         print "Distance XY:", dist_xy, \
@@ -117,8 +115,8 @@ class EnvironmentSim:
         print "Reward XY  :", reward_xy, \
             "\nReward Z   :", reward_z
 
-        if self.current_timestep % 4 == 0:
-            reward += 0.05
+        print "Reward (+T):", reward
+        reward += 0.1
 
         # cv2.imshow('Simulation', frame)
         # cv2.waitKey(5)
@@ -126,7 +124,10 @@ class EnvironmentSim:
         # NEXT frame
         _state = State()
 
-        if dist_z>(abs(self._uav_connector.INIT_Z) - 3) or reward<-10 or car_pos.z_val<=-2.0:
+        if (uav_pos.z_val > self.MIN_ALTITUDE) or \
+           (uav_pos.z_val < self.MAX_ALTITUDE) or \
+           reward_xy<0.0 or \
+           car_pos.z_val<=-2.0:
             reward = -10
             done   = 1
         else:
@@ -138,5 +139,7 @@ class EnvironmentSim:
         print "Reward     :", reward
         print "Action RL  :", action, "+m/s"
         print "Done       :", done
+
+        self.current_timestep += 1
 
         return self.state_to_array(_state), reward, done

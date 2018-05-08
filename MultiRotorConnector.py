@@ -13,7 +13,7 @@ class MultiRotorConnector:
 
     INIT_X = -0
     INIT_Y = -0
-    INIT_Z = -18
+    INIT_Z = -20
 
     def __init__(self):
         self.client = MultirotorClient()
