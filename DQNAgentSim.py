@@ -149,20 +149,19 @@ class DeepQAgent(object):
     MEMORY_SIZE            = 1000000  # Number of replay memory the agent uses for training
     BATCH_SIZE             = 32  # Mini batch size
     TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
-    TRAIN_AFTER            = 500 # Number of Steps after which training starts
     TRAIN_INTERVAL         = 4  # The agent selects 4 actions between successive updates
     LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
     MOMENTUM               = 0.95  # Momentum used by RMSProp
     MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
     SAVE_INTERVAL          = 5000  # The frequency with which the network is saved
     LOAD_NETWORK           = True
-    SAVE_NETWORK_PATH      = 'models_sim/still_newer'
-    SAVE_SUMMARY_PATH      = 'logs/still_newer'
+    SAVE_NETWORK_PATH      = 'models_sim/still_newest'
+    SAVE_SUMMARY_PATH      = 'logs/still_newest'
 
     def __init__(self, input_shape, nb_actions):
         self.t            = 0
         self.epsilon      = self.INITIAL_EPSILON
-        self.epsilon_step = (self.INITIAL_EPSILON - self.FINAL_EPSILON) / self.EXPLORATION_STEPS
+        self.epsilon_step = (self.INITIAL_EPSILON - self.FINAL_EPSILON) / (self.EXPLORATION_STEPS * self.STATE_LENGTH)
 
         self.total_reward  = 0.0
         self.total_q_max   = 0.0
@@ -183,7 +182,7 @@ class DeepQAgent(object):
             path = None
             with open('pickle.txt', 'rb') as f:
                 path   = f.readline().rstrip('\n')
-                params = path.split('.')[0].split('_')
+                params = path[:-7].split('_')
 
                 self.episode            = int(params[1])
                 self.t                  = int(params[2])
@@ -289,8 +288,6 @@ class DeepQAgent(object):
     def observe(self, old_state, action, reward, done):
         """ This allows the agent to observe the output of doing the action it selected through act() on the old_state
         """
-        self.total_reward += reward
-
         # If done, reset short term memory (ie. History)
         self.total_reward += reward
         env_with_history = self._history.value
@@ -301,7 +298,7 @@ class DeepQAgent(object):
             # Write summary
             if self.t >= self.INITIAL_REPLAY_SIZE:
                 stats = [self.total_reward, self.total_q_max / float(self.duration),
-                        self.duration, self.total_loss / (float(self.duration) / float(self.TRAIN_INTERVAL))]
+                        self.duration, self.total_loss / (float(self.duration) / float(self.TRAIN_INTERVAL)), self.t]
                 for i in range(len(stats)):
                     self.sess.run(self.update_ops[i], feed_dict={
                         self.summary_placeholders[i]: float(stats[i])
@@ -404,13 +401,15 @@ class DeepQAgent(object):
         episode_avg_max_q    = tf.Variable(0.)
         episode_duration     = tf.Variable(0.)
         episode_avg_loss     = tf.Variable(0.)
+        episode_timestep     = tf.Variable(0.)
 
         tf.summary.scalar('logs/Total Reward/Episode', episode_total_reward)
         tf.summary.scalar('logs/Average Max Q/Episode', episode_avg_max_q)
         tf.summary.scalar('logs/Duration/Episode', episode_duration)
         tf.summary.scalar('logs/Average Loss/Episode', episode_avg_loss)
+        tf.summary.scalar('logs/Timestep/Episode', episode_timestep)
 
-        summary_vars         = [episode_total_reward, episode_avg_max_q, episode_duration, episode_avg_loss]
+        summary_vars         = [episode_total_reward, episode_avg_max_q, episode_duration, episode_avg_loss, episode_timestep]
         summary_placeholders = [tf.placeholder(tf.float32) for _ in range(len(summary_vars))]
         update_ops           = [summary_vars[i].assign(summary_placeholders[i]) for i in range(len(summary_vars))]
         summary_op           = tf.summary.merge_all()

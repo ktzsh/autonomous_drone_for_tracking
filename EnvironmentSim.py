@@ -31,10 +31,10 @@ class EnvironmentSim:
         self.im_width  = image_shape[1]
         self.im_height = image_shape[0]
 
-        self.max_dist   = 50.0
+        self.max_dist   = 80.0
         self.max_dist_z = 10.0
 
-        self.MIN_ALTITUDE = -1.0
+        self.MIN_ALTITUDE = -0.5
         self.MAX_ALTITUDE = -40.0
 
         self.current_frame    = None
@@ -109,14 +109,14 @@ class EnvironmentSim:
         else:
             reward_z = -1.0 * reward_z
 
-        reward    = (reward_xy + reward_z)/2.0
+        reward    = (reward_xy + reward_z)
         print "Distance XY:", dist_xy, \
             "\nDistance Z :", dist_z
         print "Reward XY  :", reward_xy, \
             "\nReward Z   :", reward_z
 
         print "Reward (+T):", reward
-        reward += 0.1
+        reward += 0.15
 
         # cv2.imshow('Simulation', frame)
         # cv2.waitKey(5)
