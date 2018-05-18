@@ -57,7 +57,7 @@ class EnvironmentSim:
 
         car_pos, car_ort = self._car_connector.reset()
         self._uav_connector.reset()
-        self._uav_connector.move_by_angle(car_ort, self._uav_connector.INIT_Z)
+        # self._uav_connector.move_by_angle(car_ort, self._uav_connector.INIT_Z)
         self._car_connector.drive()
 
         car_pos = self._car_connector.get_position()
@@ -118,8 +118,9 @@ class EnvironmentSim:
         print "Reward (+T):", reward
         reward += 0.15
 
-        # cv2.imshow('Simulation', frame)
-        # cv2.waitKey(5)
+        frame = self._uav_connector.get_frame(path=('data/final/' + str(self.current_timestep).zfill(4) + '.jpg'))
+        cv2.imshow('Simulation', frame)
+        cv2.waitKey(5)
 
         # NEXT frame
         _state = State()

@@ -81,11 +81,11 @@ class CarConnector:
                 self.car_controls.is_manual_gear = False
                 self.car_controls.manual_gear    = 0
             self.car_controls.brake    = 0
-            self.car_controls.throttle = 0.25
+            self.car_controls.throttle = 0.0625
             self.car_controls.steering = 0
 
         if self.mode=="deacc":
-            self.car_controls.throttle       = -0.25
+            self.car_controls.throttle       = -0.1
             self.car_controls.is_manual_gear = True
             self.car_controls.manual_gear    = -1
 
@@ -93,7 +93,7 @@ class CarConnector:
             if self.car_controls.is_manual_gear:
                 self.car_controls.is_manual_gear = False
                 self.car_controls.manual_gear    = 0
-            self.car_controls.brake    = 0.25
+            self.car_controls.brake    = 0.125
             self.car_controls.throttle = 0
             self.car_controls.steering = 0
 
@@ -103,7 +103,7 @@ class CarConnector:
                 self.car_controls.manual_gear    = 0
             self.car_controls.brake    = 0
             self.car_controls.throttle = 1
-            self.car_controls.steering = np.random.sample()*2*0.25 - 0.25
+            self.car_controls.steering = np.random.sample()*2*0.125 - 0.125
 
         elif self.mode=="acc-deacc":
             max_actions = self.max_actions
@@ -112,14 +112,14 @@ class CarConnector:
                     self.car_controls.is_manual_gear = False
                     self.car_controls.manual_gear    = 0
                 self.index                       = 0
-                self.car_controls.throttle       = 0.25
+                self.car_controls.throttle       = 0.125
             elif self.index == (max_actions*7/8):
                 if self.car_controls.is_manual_gear:
                     self.car_controls.is_manual_gear = False
                     self.car_controls.manual_gear    = 0
                 self.car_controls.throttle       = 0
             elif self.index == (max_actions*4/8):
-                self.car_controls.throttle       = -0.25
+                self.car_controls.throttle       = -0.125
                 self.car_controls.is_manual_gear = True
                 self.car_controls.manual_gear    = -1
             elif self.index == (max_actions*2/8):
@@ -139,7 +139,7 @@ class CarConnector:
                     else:
                         print "[DRIVER]: THROTLE"
                         self.car_controls.brake    = 0
-                        self.car_controls.throttle = 1
+                        self.car_controls.throttle = 0.125
                 elif x==2:
                     print "[DRIVER]: CONST."
                     self.car_controls.brake    = 0
@@ -152,6 +152,6 @@ class CarConnector:
                     else:
                         print "[DRIVER]: THROTLE"
                         self.car_controls.brake    = 0
-                        self.car_controls.throttle = 1
-                self.car_controls.steering = np.random.sample()*2*0.25 - 0.25
+                        self.car_controls.throttle = 0.125
+                self.car_controls.steering = np.random.sample()*2*0.125 - 0.125
         self.index += 1

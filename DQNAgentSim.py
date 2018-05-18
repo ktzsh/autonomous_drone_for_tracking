@@ -142,7 +142,7 @@ class DeepQAgent(object):
 
     STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
     GAMMA                  = 0.99  # Discount factor
-    EXPLORATION_STEPS      = 20000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+    EXPLORATION_STEPS      = 50000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
     INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
     FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
     INITIAL_REPLAY_SIZE    = 5000  # Number of steps to populate the replay memory before training starts
@@ -153,10 +153,10 @@ class DeepQAgent(object):
     LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
     MOMENTUM               = 0.95  # Momentum used by RMSProp
     MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
-    SAVE_INTERVAL          = 5000  # The frequency with which the network is saved
+    SAVE_INTERVAL          = 10000  # The frequency with which the network is saved
     LOAD_NETWORK           = True
-    SAVE_NETWORK_PATH      = 'models_sim/still_newest'
-    SAVE_SUMMARY_PATH      = 'logs/still_newest'
+    SAVE_NETWORK_PATH      = 'models'
+    SAVE_SUMMARY_PATH      = 'logs'
 
     def __init__(self, input_shape, nb_actions):
         self.t            = 0
@@ -432,7 +432,8 @@ class DeepQAgent(object):
             env_with_history = self._history.value
             action = np.argmax(self.q_values.eval(feed_dict={self.s: env_with_history.reshape((1,) + env_with_history.shape)}))
             return action
-        return None
+        else:
+            return 0
 
 
 def interpret_action(action):
@@ -503,8 +504,6 @@ if __name__=='__main__':
 
         while True:
             action = agent.test(current_state)
-            quad_offset = None
-            if action is not None:
-                quad_offset, _ = interpret_action_seq(action, step_sizes)
+            quad_offset = interpret_action(action)
             new_state, _, _ = env.step(quad_offset)
             current_state = new_state

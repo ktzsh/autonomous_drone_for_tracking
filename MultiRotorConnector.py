@@ -34,7 +34,7 @@ class MultiRotorConnector:
         img1d = np.fromstring(response.image_data_uint8, dtype=np.uint8) # get numpy array
         img_rgba = img1d.reshape(response.height, response.width, 4) # reshape array to 4 channel image array H X W X 4
         img_rgba = np.flipud(img_rgba) # original image is fliped vertically
-        return img_rgba
+        # return img_rgba
 
         # TODO - Implement conversion of uncmpressed RGBA to RGB without writing to disk
         self.client.write_png(os.path.normpath(path), img_rgba)

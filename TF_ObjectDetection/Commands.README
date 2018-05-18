@@ -1,0 +1,4 @@
+python prepare_data.py --flag=train --output_path=/home/kshitiz/workspace/autonomous_drone_for_tracking/TF_ObjectDetection/data/train.record
+python prepare_data.py --flag=val --output_path=/home/kshitiz/workspace/autonomous_drone_for_tracking/TF_ObjectDetection/data/val.record
+python object_detection/export_inference_graph.py --input_type image_tensor --pipeline_config_path ssd_mobilenet_v1_coco.config --trained_checkpoint_prefix /home/kshitiz/workspace/autonomous_drone_for_tracking/TF_ObjectDetection/data/model.ckpt-100000 --output_directory /home/kshitiz/workspace/autonomous_drone_for_tracking/TF_ObjectDetection/output/
+python object_detection/train.py --logtostderr --pipeline_config_path=/home/kshitiz/workspace/autonomous_drone_for_tracking/TF_ObjectDetection/ssd_mobilenet_v1_coco.config --train_dir=/home/kshitiz/workspace/autonomous_drone_for_tracking/TF_ObjectDetection/data/

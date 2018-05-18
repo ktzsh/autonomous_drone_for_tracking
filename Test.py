@@ -1,4 +1,34 @@
+import os
+import sys
 import time
+python_path = os.path.abspath('AirSim/PythonClient')
+sys.path.append(python_path)
+from AirSimClient import *
+
+def test_drone():
+    client = MultirotorClient()
+    client.confirmConnection()
+    client.enableApiControl(True)
+    client.armDisarm(True)
+    client.takeoff()
+    client.moveToPosition(0, 0, -15, 10)
+    i = 0
+    while True:
+        offset = [0.25, 0.25, 0.0]
+        quad_vel = client.getVelocity()
+        quad_pos = client.getPosition()
+        print i
+        print quad_vel
+        print quad_pos, "\n\n"
+        # client.moveByVelocityZ( quad_vel.x_val + offset[0],
+        #                         quad_vel.y_val + offset[1],
+        #                        -15, 2)
+        client.moveByVelocity( quad_vel.x_val + offset[0],
+                                    quad_vel.y_val + offset[1],
+                                    quad_vel.z_val + offset[2],
+                                    5)
+        time.sleep(0.5)
+        i += 1
 
 def test_car_reset():
     from CarConnector import CarConnector
@@ -35,5 +65,4 @@ def test_get_images_at_positions():
                 print "\tTest Case:", x_val+x, y_val+y, z_val+z, path
 
 if __name__=='__main__':
-
-    test_get_images_at_positions()
+    test_drone()

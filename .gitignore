@@ -1,4 +1,13 @@
 # Custom
+chkpnt-*
+models/
+TF_ObjectDetection/models/
+pickle*
+memory_*
+logs/
+data/
+model.*
+events.*
 TF_ObjectDetection/data/
 
 # Byte-compiled / optimized / DLL files
