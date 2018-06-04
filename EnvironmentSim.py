@@ -9,11 +9,6 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import xml.etree.ElementTree as ET
 
-python_path = os.path.abspath('TF_ObjectDetection')
-sys.path.append(python_path)
-from object_detection.utils import visualization_utils as vis_util
-
-from Detector import Detector
 from MultiRotorConnector import MultiRotorConnector
 from CarConnector import CarConnector
 
@@ -25,6 +20,9 @@ class State():
 
 class EnvironmentSim:
     def __init__(self, image_shape=(720, 1280)):
+        if not os.path.exists('data'):
+            os.mkdir('data/')
+
         self.current_episode  = 0
         self.current_timestep = 0
 
@@ -40,7 +38,6 @@ class EnvironmentSim:
         self.current_frame    = None
         self.current_output   = None
 
-        self._detector      = Detector()
         self._uav_connector = MultiRotorConnector()
         self._car_connector = CarConnector()
 
@@ -118,7 +115,7 @@ class EnvironmentSim:
         print "Reward (+T):", reward
         reward += 0.15
 
-        frame = self._uav_connector.get_frame(path=('data/final/' + str(self.current_timestep).zfill(4) + '.jpg'))
+        frame = self._uav_connector.get_frame(path=('data/' + str(self.current_timestep).zfill(4) + '.jpg'))
         cv2.imshow('Simulation', frame)
         cv2.waitKey(5)
 

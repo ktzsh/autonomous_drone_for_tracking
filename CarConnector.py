@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import json
 import numpy as np
 
 python_path = os.path.abspath('AirSim/PythonClient')
