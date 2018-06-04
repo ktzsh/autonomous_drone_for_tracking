@@ -1,6 +1,7 @@
 from EnvironmentSim import EnvironmentSim
 
 import os
+import json
 import random
 import pickle
 import numpy as np
@@ -140,25 +141,30 @@ class DeepQAgent(object):
     Nature 518. "Human-level control through deep reinforcement learning" (Mnih & al. 2015)
     """
 
-    STATE_LENGTH           = 4  # Number of most recent frames to produce the input to the network
-    GAMMA                  = 0.99  # Discount factor
-    EXPLORATION_STEPS      = 50000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
-    INITIAL_EPSILON        = 1.0  # Initial value of epsilon in epsilon-greedy
-    FINAL_EPSILON          = 0.1  # Final value of epsilon in epsilon-greedy
-    INITIAL_REPLAY_SIZE    = 5000  # Number of steps to populate the replay memory before training starts
-    MEMORY_SIZE            = 1000000  # Number of replay memory the agent uses for training
-    BATCH_SIZE             = 32  # Mini batch size
-    TARGET_UPDATE_INTERVAL = 10000  # The frequency with which the target network is updated
-    TRAIN_INTERVAL         = 4  # The agent selects 4 actions between successive updates
-    LEARNING_RATE          = 0.00025  # Learning rate used by RMSProp
-    MOMENTUM               = 0.95  # Momentum used by RMSProp
-    MIN_GRAD               = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update
-    SAVE_INTERVAL          = 10000  # The frequency with which the network is saved
-    LOAD_NETWORK           = True
-    SAVE_NETWORK_PATH      = 'models'
-    SAVE_SUMMARY_PATH      = 'logs'
 
     def __init__(self, input_shape, nb_actions):
+
+        with open("config.json") as config_buffer:
+            self.config = json.loads(config_buffer.read())
+
+        self.STATE_LENGTH           = self.config['STATE_LENGTH']
+        self.GAMMA                  = self.config['GAMMA']
+        self.EXPLORATION_STEPS      = self.config['EXPLORATION_STEPS']
+        self.INITIAL_EPSILON        = self.config['INITIAL_EPSILON']
+        self.FINAL_EPSILON          = self.config['FINAL_EPSILON']
+        self.INITIAL_REPLAY_SIZE    = self.config['INITIAL_REPLAY_SIZE']
+        self.MEMORY_SIZE            = self.config['MEMORY_SIZE']
+        self.BATCH_SIZE             = self.config['BATCH_SIZE']
+        self.TARGET_UPDATE_INTERVAL = self.config['TARGET_UPDATE_INTERVAL']
+        self.TRAIN_INTERVAL         = self.config['TRAIN_INTERVAL']
+        self.LEARNING_RATE          = self.config['LEARNING_RATE']
+        self.MOMENTUM               = self.config['MOMENTUM']
+        self.MIN_GRAD               = self.config['MIN_GRAD']
+        self.SAVE_INTERVAL          = self.config['SAVE_INTERVAL']
+        self.LOAD_NETWORK           = self.config['LOAD_NETWORK']
+        self.SAVE_NETWORK_PATH      = self.config['SAVE_NETWORK_PATH']
+        self.SAVE_SUMMARY_PATH      = self.config['SAVE_SUMMARY_PATH']
+
         self.t            = 0
         self.epsilon      = self.INITIAL_EPSILON
         self.epsilon_step = (self.INITIAL_EPSILON - self.FINAL_EPSILON) / (self.EXPLORATION_STEPS * self.STATE_LENGTH)
@@ -455,28 +461,25 @@ def interpret_action(action):
 
     return quad_offset
 
-# def interpret_action_seq(action, step_sizes):
-#     action_size = len(step_sizes)
-#     quad_offset = (step_sizes[action%action_size], step_sizes[action/action_size])
-#     name        = str(quad_offset) + " m"
-#
-#     return quad_offset, name
-
 
 def restart_game():
     return env.reset()
 
 
 if __name__=='__main__':
-    TEST             = False # False
+
+    with open("config.json") as config_buffer:
+        config = json.loads(config_buffer.read())
+    TEST         = config["TEST"]
+    BUFF_FRAMES  = config["STATE_LENGTH"]
+
     # Make RL agent
-    input_dims       = 3 # 8
-    num_actions      = 7 # 7
-    num_buff_frames  = 4
+    input_dims       = 3
+    num_actions      = 7
     im_width         = 1280
     im_height        = 720
 
-    agent = DeepQAgent((num_buff_frames, input_dims), num_actions)
+    agent = DeepQAgent((BUFF_FRAMES, input_dims), num_actions)
 
     if not TEST:
         # Train

@@ -9,16 +9,18 @@ from AirSimClient import *
 
 class CarConnector:
     def __init__(self):
-        self.MAX_SPEED    = 10.0
-        self.MIN_SPEED    = 0.1
+        with open("config.json") as config_buffer:
+            self.config = json.loads(config_buffer.read())
+
+        self.max_speed    = self.config['driver']['max_speed']
+        self.min_speed    = self.config['driver']['min_speed']
+        self.max_actions  = self.config['driver']['max_actions']
+        self.modes        = self.config['driver']['selected_modes']
+        self.throttle     = self.config['driver']['throttle']
+        self.max_steering = self.config['driver']['max_steering']
 
         self.index        = 0
         self.trajectory   = 0
-
-        self.max_actions = 64
-
-        self.modes = ['acc', 'deacc', 'still', 'brake']
-        self.mode  = 'still'
 
         self.client = CarClient()
         self.client.confirmConnection()
@@ -68,8 +70,8 @@ class CarConnector:
         self.client.setCarControls(self.car_controls)
 
     def get_controls(self):
-        # if self.index % self.max_actions == 0:
-        #     self.mode = np.random.choice(self.modes, 1)
+        if self.index % self.max_actions == 0:
+            self.mode = np.random.choice(self.modes, 1)
 
         if self.mode=="still":
             self.car_controls.brake    = 0
@@ -81,11 +83,11 @@ class CarConnector:
                 self.car_controls.is_manual_gear = False
                 self.car_controls.manual_gear    = 0
             self.car_controls.brake    = 0
-            self.car_controls.throttle = 0.0625
+            self.car_controls.throttle = self.throttle
             self.car_controls.steering = 0
 
         if self.mode=="deacc":
-            self.car_controls.throttle       = -0.1
+            self.car_controls.throttle       = -1*self.throttle
             self.car_controls.is_manual_gear = True
             self.car_controls.manual_gear    = -1
 
@@ -93,7 +95,7 @@ class CarConnector:
             if self.car_controls.is_manual_gear:
                 self.car_controls.is_manual_gear = False
                 self.car_controls.manual_gear    = 0
-            self.car_controls.brake    = 0.125
+            self.car_controls.brake    = 1
             self.car_controls.throttle = 0
             self.car_controls.steering = 0
 
@@ -102,56 +104,28 @@ class CarConnector:
                 self.car_controls.is_manual_gear = False
                 self.car_controls.manual_gear    = 0
             self.car_controls.brake    = 0
-            self.car_controls.throttle = 1
-            self.car_controls.steering = np.random.sample()*2*0.125 - 0.125
-
-        elif self.mode=="acc-deacc":
-            max_actions = self.max_actions
-            if self.index % max_actions == 0:
-                if self.car_controls.is_manual_gear:
-                    self.car_controls.is_manual_gear = False
-                    self.car_controls.manual_gear    = 0
-                self.index                       = 0
-                self.car_controls.throttle       = 0.125
-            elif self.index == (max_actions*7/8):
-                if self.car_controls.is_manual_gear:
-                    self.car_controls.is_manual_gear = False
-                    self.car_controls.manual_gear    = 0
-                self.car_controls.throttle       = 0
-            elif self.index == (max_actions*4/8):
-                self.car_controls.throttle       = -0.125
-                self.car_controls.is_manual_gear = True
-                self.car_controls.manual_gear    = -1
-            elif self.index == (max_actions*2/8):
-                if self.car_controls.is_manual_gear:
-                    self.car_controls.is_manual_gear = False
-                    self.car_controls.manual_gear    = 0
-                self.car_controls.throttle       = 0
+            self.car_controls.throttle = self.throttle
+            self.car_controls.steering = (np.random.sample()*2 - 1)*self.max_steering
 
         elif self.mode=="random":
             if self.index % 4 == 0:
                 x = np.random.randint(1, high=4)
                 if x==1:
-                    if self.client.getCarState().speed >= self.MAX_SPEED-5.0:
-                        print "[DRIVER]: BRAKE"
+                    if self.client.getCarState().speed >= self.max_speed-5.0:
                         self.car_controls.brake    = 1
                         self.car_controls.throttle = 0
                     else:
-                        print "[DRIVER]: THROTLE"
                         self.car_controls.brake    = 0
-                        self.car_controls.throttle = 0.125
+                        self.car_controls.throttle = self.throttle
                 elif x==2:
-                    print "[DRIVER]: CONST."
                     self.car_controls.brake    = 0
                     self.car_controls.throttle = 0
                 else:
-                    if self.client.getCarState().speed >= self.MAX_SPEED/2.0:
-                        print "[DRIVER]: BRAKE"
+                    if self.client.getCarState().speed >= self.max_speed/2.0:
                         self.car_controls.brake    = 1
                         self.car_controls.throttle = 0
                     else:
-                        print "[DRIVER]: THROTLE"
                         self.car_controls.brake    = 0
-                        self.car_controls.throttle = 0.125
-                self.car_controls.steering = np.random.sample()*2*0.125 - 0.125
+                        self.car_controls.throttle = self.throttle
+                self.car_controls.steering = (np.random.sample()*2 - 1.0)*self.throttle
         self.index += 1
