@@ -50,7 +50,7 @@
 
     "_comment_"              : "Parameters for car driving algorithim",
     "driver" : {
-        "max_speed"          : 20.0,
+        "max_speed"          : 40.0,
         "min_speed"          : 0.0,
         "max_steering"       : 0.25,
         "throttle"           : 0.125,

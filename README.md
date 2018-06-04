@@ -21,7 +21,7 @@ Object Tracking is done by using simulator to get the realtime location of the o
 1. Update the config file in config.json
     - Choose Training Parameters
     - Choose Car Driving Algorithim or drive manually
-2. Run `python trainer.py`
+2. Run `python DQNAgentSim.py`
 
 ## NOTE
 The code for using the object detection network is available under `experiments`
