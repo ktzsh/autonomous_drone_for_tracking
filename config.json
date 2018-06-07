@@ -3,7 +3,7 @@
     "TEST"                   : false,
 
     "_comment_"              : "Number of most recent frames to produce the input to the network",
-    "STATE_LENGTH"           : 4,
+    "STATE_LENGTH"           : 6,
 
     "_comment_"              : "Discount factor",
     "GAMMA"                  : 0.99,
@@ -30,7 +30,7 @@
     "TARGET_UPDATE_INTERVAL" : 10000,
 
     "_comment_"              : "The agent selects 4 actions between successive updates",
-    "TRAIN_INTERVAL"         : 4,
+    "TRAIN_INTERVAL"         : 6,
 
     "_comment_"              : "Learning rate used by RMSProp",
     "LEARNING_RATE"          : 0.00025,
@@ -45,8 +45,11 @@
     "SAVE_INTERVAL"          : 10000,
 
     "LOAD_NETWORK"           : true,
-    "SAVE_NETWORK_PATH"      : "models",
-    "SAVE_SUMMARY_PATH"      : "logs",
+    "SAVE_NETWORK_PATH"      : "models/",
+    "SAVE_SUMMARY_PATH"      : "logs/",
+
+    "IMAGE_HEIGHT"           : 540,
+    "IMAGE_WIDTH"            : 960,
 
     "_comment_"              : "Parameters for car driving algorithim",
     "driver" : {

@@ -30,7 +30,7 @@ class EnvironmentSim:
         self.im_height = image_shape[0]
 
         self.max_dist   = 80.0
-        self.max_dist_z = 10.0
+        self.max_dist_z = 5.0
 
         self.MIN_ALTITUDE = -0.5
         self.MAX_ALTITUDE = -40.0
@@ -113,7 +113,7 @@ class EnvironmentSim:
             "\nReward Z   :", reward_z
 
         print "Reward (+T):", reward
-        reward += 0.15
+        reward += 0.20
 
         frame = self._uav_connector.get_frame(path=('data/' + str(self.current_timestep).zfill(4) + '.jpg'))
         cv2.imshow('Simulation', frame)

@@ -8,7 +8,7 @@ import numpy as np
 import tensorflow as tf
 from collections import deque
 from keras.models import Sequential
-from keras.layers import Convolution2D, Flatten, Dense, LSTM
+from keras.layers import Convolution2D, Flatten, Dense, LSTM, Dropout
 
 class ReplayMemory(object):
     """
@@ -222,7 +222,9 @@ class DeepQAgent(object):
         self.saver = tf.train.Saver(q_network_weights)
 
         self.summary_placeholders, self.update_ops, self.summary_op = self.setup_summary()
-        self.summary_writer = tf.summary.FileWriter(self.SAVE_SUMMARY_PATH, self.sess.graph)
+
+        tb_counter  = len([log for log in os.listdir(os.path.expanduser(self.SAVE_SUMMARY_PATH)) if 'Experiment_' in log]) + 1
+        self.summary_writer = tf.summary.FileWriter(self.SAVE_SUMMARY_PATH + 'Experiment_' + str(tb_counter), self.sess.graph)
 
         if not os.path.exists(self.SAVE_NETWORK_PATH):
             os.makedirs(self.SAVE_NETWORK_PATH)
@@ -239,9 +241,11 @@ class DeepQAgent(object):
 
     def build_network(self, input_shape):
         model = Sequential()
-        model.add(LSTM(16, input_shape=input_shape)) # 32
-        model.add(Dense(32, activation='relu')) # 64
+        model.add(LSTM(32, input_shape=input_shape)) # 32
+        model.add(Dense(64, activation='relu')) # 64
+        model.add(Dropout(0.2))
         model.add(Dense(32, activation='relu')) # 32
+        model.add(Dropout(0.2))
         model.add(Dense(self.nb_actions))
 
         s = tf.placeholder(tf.float32, (None,) + input_shape)
@@ -381,7 +385,7 @@ class DeepQAgent(object):
 
                 # Save network
                 if self.t % self.SAVE_INTERVAL == 0:
-                    save_path = self.saver.save(self.sess, self.SAVE_NETWORK_PATH + '/chkpnt', global_step=self.t)
+                    save_path = self.saver.save(self.sess, self.SAVE_NETWORK_PATH + 'chkpnt', global_step=self.t)
                     print "Successfully saved:", save_path
 
             self.t += 1
@@ -472,12 +476,13 @@ if __name__=='__main__':
         config = json.loads(config_buffer.read())
     TEST         = config["TEST"]
     BUFF_FRAMES  = config["STATE_LENGTH"]
+    im_width     = config["IMAGE_WIDTH"]
+    im_height    = config["IMAGE_HEIGHT"]
 
     # Make RL agent
     input_dims       = 3
     num_actions      = 7
-    im_width         = 1280
-    im_height        = 720
+
 
     agent = DeepQAgent((BUFF_FRAMES, input_dims), num_actions)
 
