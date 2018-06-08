@@ -26,7 +26,7 @@ class MultiRotorConnector:
         self.client.armDisarm(True)
         self.client.takeoff()
         self.client.moveToPosition(self.INIT_X, self.INIT_Y, self.INIT_Z, 10)
-        time.sleep(2)
+        time.sleep(0.5)
 
     # The camera ID 0 to 4 corresponds to center front, left front, right front, center downward, center rear respectively.
     def get_frame(self, camera_id=3, path='frame.png'):

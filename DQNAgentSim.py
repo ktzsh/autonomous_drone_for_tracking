@@ -223,11 +223,15 @@ class DeepQAgent(object):
 
         self.summary_placeholders, self.update_ops, self.summary_op = self.setup_summary()
 
+        if not os.path.exists(self.SAVE_NETWORK_PATH):
+            os.makedirs(self.SAVE_NETWORK_PATH)
+        if not os.path.exists(self.SAVE_SUMMARY_PATH):
+            os.makedirs(self.SAVE_SUMMARY_PATH)
+
         tb_counter  = len([log for log in os.listdir(os.path.expanduser(self.SAVE_SUMMARY_PATH)) if 'Experiment_' in log]) + 1
         self.summary_writer = tf.summary.FileWriter(self.SAVE_SUMMARY_PATH + 'Experiment_' + str(tb_counter), self.sess.graph)
 
-        if not os.path.exists(self.SAVE_NETWORK_PATH):
-            os.makedirs(self.SAVE_NETWORK_PATH)
+
 
         self.sess.run(tf.initialize_all_variables())
 
@@ -447,7 +451,7 @@ class DeepQAgent(object):
 
 
 def interpret_action(action):
-    scaling_factor   = 0.125
+    scaling_factor   = 0.25
     if action == 0:
         quad_offset = (0, 0, 0)
     elif action == 1:
