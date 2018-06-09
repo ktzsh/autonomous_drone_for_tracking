@@ -198,8 +198,12 @@ class DeepQAgent(object):
                 print "Restoring Replay Memory from", path
                 self._memory     = pickle.load(f)
                 self.pickle_path = path
+                self.tb_counter  = len([log for log in os.listdir(
+                                        os.path.expanduser(self.SAVE_SUMMARY_PATH)) if 'Experiment_' in log])
         else:
-            self._memory = ReplayMemory(self.MEMORY_SIZE, input_shape[1:], self.STATE_LENGTH)
+            self._memory     = ReplayMemory(self.MEMORY_SIZE, input_shape[1:], self.STATE_LENGTH)
+            self.tb_counter  = len([log for log in os.listdir(
+                                        os.path.expanduser(self.SAVE_SUMMARY_PATH)) if 'Experiment_' in log]) + 1
 
 
 
@@ -228,10 +232,7 @@ class DeepQAgent(object):
         if not os.path.exists(self.SAVE_SUMMARY_PATH):
             os.makedirs(self.SAVE_SUMMARY_PATH)
 
-        tb_counter  = len([log for log in os.listdir(os.path.expanduser(self.SAVE_SUMMARY_PATH)) if 'Experiment_' in log]) + 1
-        self.summary_writer = tf.summary.FileWriter(self.SAVE_SUMMARY_PATH + 'Experiment_' + str(tb_counter), self.sess.graph)
-
-
+        self.summary_writer = tf.summary.FileWriter(self.SAVE_SUMMARY_PATH + 'Experiment_' + str(self.tb_counter), self.sess.graph)
 
         self.sess.run(tf.initialize_all_variables())
 
