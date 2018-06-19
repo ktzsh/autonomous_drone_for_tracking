@@ -1,0 +1,56 @@
+QUIET                  : true     # Hide debug messages
+
+REPEAT_ACTION          : [1]      # Number of times the same action is repeated. Sampled randomly from array
+                                  # Explicit frame skipping is not required in atari gym games
+                                  # since it is already implemented.
+
+ENVIRONMENT:
+    MULTIROTOR:
+        INIT_X             : 0.0      # Initial Position of drone at start of episode
+        INIT_Y             : 0.0
+        INIT_Z             : -20.0
+    MAX_DIST_XY            : 80.0     # Max allowed distance from car in XY plane
+    MAX_DIST_Z             : 20.0     # Max allowed distance from car in Z plane
+    REWARD:
+        SCALE_XY           : 1.0
+        SCALE_Z            : 1.0
+    NUM_ACTIONS            : 7        # Num actions available
+    STATES_SHAPE           : [3]      # Dimension of state space
+    ACTION_SCALING_FACTOR  : 0.25     # +m/s minimum velocity to be changed by action
+    CAR:
+        MAX_SPEED          : 40.0
+        MIN_SPEED          : 0.0
+        STEERING           : 0.25
+        THROTTLE           : 0.125
+        MAX_ACTIONS_PER_SEQ: 64
+        AVAILABLE_MODES    : ["acc", "deacc", "still", "brake", "turn", "random"]
+        SELECTED_MODES     : ["still"]
+
+DOUBLE_Q                   : false    # Enable Double Q-Learning
+
+AGENT:
+    MAX_EPISODES           : 100000   # Maximum number of episodes
+    GAMMA                  : 0.99     # Discount factor
+    STATE_LENGTH           : 4        # Number of most recent frames to produce the input to the network
+    INITIAL_EPSILON        : 1.0      # Initial value of epsilon in epsilon-greedy
+    FINAL_EPSILON          : 0.1      # Final value of epsilon in epsilon-greedy
+
+    INITIAL_REPLAY_SIZE    : 50000    # Number of steps to populate the replay memory before training starts
+    EXPLORATION_STEPS      : 500000   # Number of exploratoion steps
+    MEMORY_SIZE            : 500000   # Number of replay memory the agent uses for training
+
+    BATCH_SIZE             : 32       # Mini batch size
+    TARGET_UPDATE_INTERVAL : 10000    # The frequency with which the target network is updated
+    TRAIN_INTERVAL         : 1        # The agent selects 4 actions between successive updates
+
+    LEARNING_RATE          : 0.00025  # Learning rate used by RMSProp
+    MOMENTUM               : 0.0      # Momentum used by RMSProp
+    MIN_GRAD               : 1.0e-6   # Constant added to the squared gradient in the denominator of the RMSProp update
+    DECAY_RATE             : 0.99
+
+    SAVE_INTERVAL          : 25000    # The frequency with which the network is saved
+    SAVE_TRAIN_STATE       : false    # Take Snapshot of Training State to resume Training
+    SAVE_TRAIN_STATE_PATH  : "snapshot/"
+    LOAD_NETWORK           : true     # Whether to load model from SAVE_NETWORK_PATH or train a new one
+    SAVE_NETWORK_PATH      : "chkpnts/"
+    SAVE_SUMMARY_PATH      : "logs/"

@@ -5,23 +5,27 @@ Object Tracking is done by using simulator to get the realtime location of the o
 
 ## Dependencies
 1. Tensorflow
-2. OpenCV (optional)
-3. AirSim (custom fork)
+2. Keras
+3. Yaml
+4. OpenCV (optional)
+5. AirSim (custom fork)
 
-## Instllation
+## Installation
 1. Run `git clone --recursive https://github.com/kshitiz38/autonomous_drone_for_tracking.git`
     - NOTE: If you didn't clone with the --recursive flag run manually the following code
         `git submodule update --init --recursive`
 
 2. AirSim
-    - Follow instructions at https://github.com/Microsoft/AirSim
+    - Follow instructions at https://github.com/kshitiz38/AirSim
+    - Run from UE4 Editor or Create the executable file:
+
+            $ RunUAT.sh BuildCookRun -project="<path to .uproject file>" -noP4 -platform=Linux -clientconfig=Development -serverconfig=Development -cook -allmaps -build -stage -pak -archive -archivedirectory="<output dir>"
+
     - Tested on Linux(Ubuntu 16.04/18.04) UE build 4.18
 
-## Usage
-1. Update the config file in config.json
-    - Choose Training Parameters
-    - Choose Car Driving Algorithim or drive manually
-2. Run `python DQNAgentSim.py`
 
-## NOTE
-The code for using the object detection network is available under `experiments`
+## Usage
+1. Update the config file in `cfg/Simulator-v0.yml`
+2. Run:
+
+        $ python DQNAgent.py

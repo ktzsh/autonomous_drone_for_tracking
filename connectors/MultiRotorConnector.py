@@ -11,11 +11,11 @@ from AirSimClient import *
 class MultiRotorConnector:
     client = None
 
-    INIT_X = -0
-    INIT_Y = -0
-    INIT_Z = -20
+    def __init__(self, init_x, init_y, init_z):
+        self.INIT_X = init_x
+        self.INIT_Y = init_y
+        self.INIT_Z = init_z
 
-    def __init__(self):
         self.client = MultirotorClient()
         self.client.confirmConnection()
         self.client.enableApiControl(True)

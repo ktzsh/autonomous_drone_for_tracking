@@ -6,6 +6,11 @@ pickle*
 memory_*
 logs/
 data/
+results/
+snapshot/
+chkpnt/
+*.lock
+*.npy
 model.*
 events.*
 TF_ObjectDetection/data/

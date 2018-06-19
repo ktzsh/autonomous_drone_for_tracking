@@ -9,16 +9,13 @@ sys.path.append(python_path)
 from AirSimClient import *
 
 class CarConnector:
-    def __init__(self):
-        with open("config.json") as config_buffer:
-            self.config = json.loads(config_buffer.read())
-
-        self.max_speed    = self.config['driver']['max_speed']
-        self.min_speed    = self.config['driver']['min_speed']
-        self.max_actions  = self.config['driver']['max_actions']
-        self.modes        = self.config['driver']['selected_modes']
-        self.throttle     = self.config['driver']['throttle']
-        self.max_steering = self.config['driver']['max_steering']
+    def __init__(self, config):
+        self.max_speed    = config['MAX_SPEED']
+        self.min_speed    = config['MIN_SPEED']
+        self.max_actions  = config['MAX_ACTIONS_PER_SEQ']
+        self.modes        = config['SELECTED_MODES']
+        self.throttle     = config['THROTTLE']
+        self.max_steering = config['STEERING']
 
         self.index        = 0
         self.trajectory   = 0
